@@ -47,7 +47,7 @@ Confirm that:
 
 * the task is already at review or otherwise review-ready
 * the review bundle is complete
-* `results.md` contains explicit persisted review intake
+* `results.md` contains an explicit review bundle with user review, verification review, and closure decision fields
 * `results.md` and `handoff.md` conform to the current task templates
 * `results.md` includes the per-stage efficiency section — Execute and Review stages should already be filled by prior agents; Close stage is filled by this agent now
 * the deliverable_spec is satisfied
@@ -99,6 +99,7 @@ If the task is ready to close:
   Status: unset
 
 * update `results.md` and `handoff.md` if they still need final status or closure notes
+* set `Closure Decision` in `results.md` to `closed` with a concrete closure reason
 * fill in the Close stage of the efficiency section in `results.md` — prompt runs and conversation restarts for this close conversation only
 * update `docs/working/backlog.md`: find the entry matching this task's backlog ID and set its status to `done`
 

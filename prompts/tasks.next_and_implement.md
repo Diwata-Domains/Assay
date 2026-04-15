@@ -18,6 +18,8 @@ This includes:
 
 Do not perform review or phase closeout in this prompt.
 
+Small fixes and hotfixes still use normal task packets. Do not bypass packet creation just because the change is small.
+
 If `docs/working/current_task.md` already points to an active task:
 
 * continue that task if its status is `in_progress` or `blocked`
@@ -205,7 +207,7 @@ Include in `results.md`:
 * blockers encountered
 * unresolved follow-up items
 
-Do NOT fill in the Review Intake section (`Review Decision`, `Definition of Done Met`, `Recommended Next Status`). Leave those fields as `[reviewer fills]`. The reviewer owns that section.
+Do NOT fill in the `User Review`, `Verification Review`, or `Closure Decision` sections. The reviewer, verifier, and closer own those sections.
 
 Include in `handoff.md`:
 

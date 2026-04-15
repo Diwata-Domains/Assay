@@ -11,8 +11,10 @@
 - **Status:** [review / blocked / in_progress]
 
 ### Outcome
-- **Review Readiness:** [ready / blocked / needs fixes]
-- **Recommended Next Status:** [review / blocked / in_progress]
+- **Review Readiness:** [ready / blocked / needs_fix]
+- **User Review State:** [pending / approved / needs_fix / misunderstood / followup_requested]
+- **Verification State:** [not_run / pending / passed / failed / inconclusive / waived]
+- **Recommended Next Status:** [review / needs_fix / blocked / in_progress / done]
 - **Short Summary:** [one sentence]
 
 ## What Was Built

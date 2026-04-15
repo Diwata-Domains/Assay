@@ -103,7 +103,7 @@ If review shows that a backlog item was too broad or should be split, record tha
 
 If a bucket is empty, return `None`.
 
-## Step 6 — Persist Review Intake For Closeout
+## Step 6 — Persist The Review Bundle For Closeout
 
 Update `results.md` directly so the structured review outcome is recorded in the task artifacts.
 
@@ -116,12 +116,16 @@ Follow the structure in:
 
 At minimum, persist:
 
-* review decision
+* user review state
+* user review summary
+* resolution mode
 * required fixes
 * open questions to log
 * proposal candidates to log
 * follow-ups to log
 * residual risks
+* verification state if a verifier was run; otherwise keep it at `not_run`
+* closure decision left open unless the task is actually being closed
 * efficiency Review stage filled in — prompt runs and conversation restarts for this review conversation only; do not modify Execute or Close stages
 
 If `handoff.md` does not exist, create it.
@@ -140,6 +144,6 @@ Return ONLY:
 8. `followups_to_log`
 9. residual risks
 10. files updated
-11. summary of persisted review intake
+11. summary of persisted review bundle
 
 No explanation.

@@ -30,12 +30,11 @@ Read:
 * docs/working/current_focus.md
 * docs/working/open_questions.md
 * docs/working/change_proposals.md
-* docs/working/future_roadmap.md
-* docs/working/v2_plan.md if present
-* docs/working/v2_adapters.md if present
-* docs/working/v2_onboarding.md if present
+* docs/working/future_roadmap.md if present
 * docs/canonical/product_scope.md
 * docs/canonical/architecture.md
+
+Read any additional planning or roadmap docs present in `docs/working/` that are declared in `docs/runtime/docs_manifest.yaml` and relevant to phase sequencing.
 
 Read any additional canonical docs declared in `docs/runtime/docs_manifest.yaml` only when they materially affect phase planning.
 
@@ -85,7 +84,7 @@ Update as needed:
 * docs/working/implementation_plan.md
 * docs/working/backlog.md
 * docs/working/current_focus.md
-* docs/working/v2_plan.md if present
+* any additional roadmap or planning docs declared in `docs/runtime/docs_manifest.yaml` if present
 
 Do not modify canonical docs.
 
