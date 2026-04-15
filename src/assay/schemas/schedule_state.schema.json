@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "assay:schedule_state",
+  "title": "Schedule State",
+  "description": "Persisted scheduler state at ~/.assay/schedules.json.",
+  "type": "object",
+  "required": ["version", "schedules"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version. Current value: \"1\"."
+    },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "cron", "suite", "created_at", "last_run", "last_result"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "UUID v4 schedule identifier."
+          },
+          "cron": {
+            "type": "string",
+            "minLength": 1,
+            "description": "5-field cron expression (minute hour day month weekday)."
+          },
+          "suite": {
+            "type": "string",
+            "description": "Named test suite to run. Empty string means default suite."
+          },
+          "target": {
+            "type": ["string", "null"],
+            "description": "Target URL or identifier. Null to use config default."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 creation timestamp."
+          },
+          "last_run": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of the last run. Null if never run."
+          },
+          "last_result": {
+            "type": ["string", "null"],
+            "enum": ["success", "failure", null],
+            "description": "Result of the last run. Null if never run."
+          }
+        }
+      }
+    }
+  }
+}

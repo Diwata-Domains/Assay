@@ -1,0 +1,20 @@
+{
+  "name": "@assay/sdk",
+  "version": "0.1.0",
+  "description": "Assay browser SDK — capture screenshots and metadata for verification",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
