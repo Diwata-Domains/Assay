@@ -8,11 +8,31 @@ captured output.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
 
 DEFAULT_IMAGE = "assay-playwright:latest"
+
+_DOCKER_FALLBACK_PATHS = [
+    "/usr/local/bin/docker",
+    "/Applications/Docker.app/Contents/Resources/bin/docker",
+    "/opt/homebrew/bin/docker",
+]
+
+
+def _find_docker() -> str:
+    """Return the docker binary path, checking PATH then known locations."""
+    found = shutil.which("docker")
+    if found:
+        return found
+    for path in _DOCKER_FALLBACK_PATHS:
+        if shutil.which(path):
+            return path
+    raise FileNotFoundError(
+        "docker binary not found on PATH or at known locations. Ensure Docker Desktop is installed and running."
+    )
 
 
 @dataclass
@@ -51,7 +71,7 @@ def run(
         output_dir = tempfile.mkdtemp(prefix="assay-")
 
     cmd = [
-        "docker",
+        _find_docker(),
         "run",
         "--rm",
         "-e",

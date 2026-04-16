@@ -36,7 +36,7 @@ def test_correct_docker_flags_passed() -> None:
     with patch("assay.runner.runner.subprocess.run", return_value=_mock_result(0)) as mock_run:
         run("https://example.com", suite="smoke", output_dir="/tmp/out", image="custom-image:v1")
     cmd = mock_run.call_args[0][0]
-    assert "docker" in cmd
+    assert any("docker" in part for part in cmd)
     assert "custom-image:v1" in cmd
     assert "-e" in cmd
     assert "ASSAY_TARGET_URL=https://example.com" in cmd
