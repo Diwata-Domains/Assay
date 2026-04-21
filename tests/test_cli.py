@@ -30,10 +30,13 @@ def test_run_requires_target() -> None:
     assert result.exit_code == 2
 
 
-def test_serve_stub() -> None:
-    result = runner.invoke(app, ["serve"])
-    assert result.exit_code == 1
-    assert "not implemented" in result.output
+def test_serve_starts_uvicorn() -> None:
+    from unittest.mock import patch
+
+    with patch("uvicorn.run") as mock_run:
+        result = runner.invoke(app, ["serve"])
+    assert result.exit_code == 0
+    assert mock_run.called
 
 
 def test_report_stub() -> None:
@@ -42,37 +45,18 @@ def test_report_stub() -> None:
     assert "not implemented" in result.output
 
 
-def test_schedule_add_stub() -> None:
-    result = runner.invoke(app, ["schedule", "add", "--cron", "0 2 * * *"])
-    assert result.exit_code == 1
-    assert "not implemented" in result.output
 
-
-def test_schedule_list_stub() -> None:
-    result = runner.invoke(app, ["schedule", "list"])
-    assert result.exit_code == 1
-    assert "not implemented" in result.output
-
-
-def test_schedule_remove_stub() -> None:
-    result = runner.invoke(app, ["schedule", "remove", "sched-001"])
-    assert result.exit_code == 1
-    assert "not implemented" in result.output
-
-
-def test_key_create_stub() -> None:
+def test_key_create_succeeds() -> None:
     result = runner.invoke(app, ["key", "create"])
-    assert result.exit_code == 1
-    assert "not implemented" in result.output
+    assert result.exit_code == 0
+    assert "key:" in result.output
 
 
-def test_key_list_stub() -> None:
+def test_key_list_empty() -> None:
     result = runner.invoke(app, ["key", "list"])
-    assert result.exit_code == 1
-    assert "not implemented" in result.output
+    assert result.exit_code == 0
 
 
-def test_key_revoke_stub() -> None:
-    result = runner.invoke(app, ["key", "revoke", "key-001"])
+def test_key_revoke_unknown_exits_1() -> None:
+    result = runner.invoke(app, ["key", "revoke", "nonexistent-id"])
     assert result.exit_code == 1
-    assert "not implemented" in result.output
