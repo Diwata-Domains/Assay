@@ -3,7 +3,7 @@
 import jsonschema
 import pytest
 
-from assay.schemas import KEY_STORE, SCHEDULE_STATE, SDK_INGEST, SENTINEL_PAYLOAD
+from assay.schemas import ASSAY_PAYLOAD, KEY_STORE, SCHEDULE_STATE, SDK_INGEST
 
 
 def _valid(schema: dict, instance: object) -> None:  # type: ignore[type-arg]
@@ -16,10 +16,10 @@ def _invalid(schema: dict, instance: object) -> None:  # type: ignore[type-arg]
 
 
 # ---------------------------------------------------------------------------
-# Sentinel payload
+# Assay result payload
 # ---------------------------------------------------------------------------
 
-SENTINEL_VALID = {
+PAYLOAD_VALID = {
     "verification_id": "a1b2c3d4-0000-0000-0000-000000000001",
     "task_id": "TASK-0070",
     "issue_type": "test_failure",
@@ -31,7 +31,7 @@ SENTINEL_VALID = {
     "verified_at": "2026-04-15T10:00:00Z",
 }
 
-SENTINEL_VALID_STANDALONE = {
+PAYLOAD_VALID_STANDALONE = {
     "verification_id": "a1b2c3d4-0000-0000-0000-000000000002",
     "task_id": None,
     "issue_type": "screenshot_evidence",
@@ -41,24 +41,24 @@ SENTINEL_VALID_STANDALONE = {
 }
 
 
-def test_sentinel_payload_valid() -> None:
-    _valid(SENTINEL_PAYLOAD, SENTINEL_VALID)
+def test_assay_payload_valid() -> None:
+    _valid(ASSAY_PAYLOAD, PAYLOAD_VALID)
 
 
-def test_sentinel_payload_valid_standalone_null_task_id() -> None:
-    _valid(SENTINEL_PAYLOAD, SENTINEL_VALID_STANDALONE)
+def test_assay_payload_valid_standalone_null_task_id() -> None:
+    _valid(ASSAY_PAYLOAD, PAYLOAD_VALID_STANDALONE)
 
 
-def test_sentinel_payload_invalid_missing_required() -> None:
-    _invalid(SENTINEL_PAYLOAD, {**SENTINEL_VALID, "outcome": None})  # outcome can't be null
+def test_assay_payload_invalid_missing_required() -> None:
+    _invalid(ASSAY_PAYLOAD, {**PAYLOAD_VALID, "outcome": None})  # outcome can't be null
 
 
-def test_sentinel_payload_invalid_bad_issue_type() -> None:
-    _invalid(SENTINEL_PAYLOAD, {**SENTINEL_VALID, "issue_type": "unknown_type"})
+def test_assay_payload_invalid_bad_issue_type() -> None:
+    _invalid(ASSAY_PAYLOAD, {**PAYLOAD_VALID, "issue_type": "unknown_type"})
 
 
-def test_sentinel_payload_invalid_bad_severity() -> None:
-    _invalid(SENTINEL_PAYLOAD, {**SENTINEL_VALID, "severity": "low"})
+def test_assay_payload_invalid_bad_severity() -> None:
+    _invalid(ASSAY_PAYLOAD, {**PAYLOAD_VALID, "severity": "low"})
 
 
 # ---------------------------------------------------------------------------

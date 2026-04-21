@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "assay:sentinel_payload",
-  "title": "Sentinel Result Payload",
-  "description": "Payload produced by Assay and ingested by Grain via `grain verify ingest`. Defined by Grain bridge contract (v2_plan.md §11.2).",
+  "$id": "assay:payload",
+  "title": "Assay Result Payload",
+  "description": "Payload produced by Assay and written to the configured output directory. One file per run, named assay-<timestamp>-<uuid>.json.",
   "type": "object",
   "required": ["verification_id", "task_id", "issue_type", "severity", "outcome", "summary"],
   "additionalProperties": false,

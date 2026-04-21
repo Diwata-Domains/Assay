@@ -9,7 +9,7 @@ def _load(name: str) -> dict[str, object]:
     return result
 
 
-SENTINEL_PAYLOAD = _load("sentinel_payload.schema.json")
+ASSAY_PAYLOAD = _load("assay_payload.schema.json")
 SDK_INGEST = _load("sdk_ingest.schema.json")
 KEY_STORE = _load("key_store.schema.json")
 SCHEDULE_STATE = _load("schedule_state.schema.json")

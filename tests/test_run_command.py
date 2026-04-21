@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -43,13 +44,18 @@ _INCONCLUSIVE_BUNDLE = ArtifactBundle(
 )
 
 _MOCK_RUN_RESULT = RunResult(exit_code=0, output_dir="/tmp/assay-test")
+_MOCK_PACKET: dict[str, object] = {"verification_id": "test-id", "outcome": "pass"}
+_MOCK_PACKET_PATH = Path("/tmp/assay-test/assay-20260416-test-id.json")
 
 
-def _patch_runner(bundle: ArtifactBundle):  # type: ignore[no-untyped-def]
-    """Context manager that patches both runner.run and collect_artifacts."""
-    run_mock = patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT)
-    artifacts_mock = patch("assay.runner.artifacts.collect_artifacts", return_value=bundle)
-    return run_mock, artifacts_mock
+def _base_patches(bundle: ArtifactBundle):  # type: ignore[no-untyped-def]
+    """Stack of patches needed for all run command tests."""
+    return (
+        patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
+        patch("assay.runner.artifacts.collect_artifacts", return_value=bundle),
+        patch("assay.cli.main.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", return_value=_MOCK_PACKET_PATH),
+    )
 
 
 def test_run_missing_target_exits_2() -> None:
@@ -61,6 +67,8 @@ def test_run_pass_exits_0() -> None:
     with (
         patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
         patch("assay.runner.artifacts.collect_artifacts", return_value=_PASS_BUNDLE),
+        patch("assay.cli.main.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", return_value=_MOCK_PACKET_PATH),
     ):
         result = runner.invoke(app, ["run", "--target", "https://example.com"])
     assert result.exit_code == 0
@@ -71,6 +79,8 @@ def test_run_fail_exits_3() -> None:
     with (
         patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
         patch("assay.runner.artifacts.collect_artifacts", return_value=_FAIL_BUNDLE),
+        patch("assay.cli.main.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", return_value=_MOCK_PACKET_PATH),
     ):
         result = runner.invoke(app, ["run", "--target", "https://example.com"])
     assert result.exit_code == 3
@@ -81,6 +91,8 @@ def test_run_inconclusive_exits_1() -> None:
     with (
         patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
         patch("assay.runner.artifacts.collect_artifacts", return_value=_INCONCLUSIVE_BUNDLE),
+        patch("assay.cli.main.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", return_value=_MOCK_PACKET_PATH),
     ):
         result = runner.invoke(app, ["run", "--target", "https://example.com"])
     assert result.exit_code == 1
@@ -90,7 +102,10 @@ def test_run_inconclusive_exits_1() -> None:
 def test_run_artifact_error_exits_1() -> None:
     with (
         patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
-        patch("assay.runner.artifacts.collect_artifacts", side_effect=ArtifactError("failed to parse result.json")),
+        patch(
+            "assay.runner.artifacts.collect_artifacts",
+            side_effect=ArtifactError("failed to parse result.json"),
+        ),
     ):
         result = runner.invoke(app, ["run", "--target", "https://example.com"])
     assert result.exit_code == 1
@@ -101,8 +116,32 @@ def test_run_passes_suite_to_runner() -> None:
     with (
         patch("assay.runner.runner.run", run_mock),
         patch("assay.runner.artifacts.collect_artifacts", return_value=_PASS_BUNDLE),
+        patch("assay.cli.main.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", return_value=_MOCK_PACKET_PATH),
     ):
         runner.invoke(app, ["run", "--target", "https://example.com", "--suite", "smoke"])
     run_mock.assert_called_once()
     _args, kwargs = run_mock.call_args
     assert kwargs.get("suite") == "smoke" or _args[1] == "smoke"
+
+
+def test_run_prints_packet_path() -> None:
+    with (
+        patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
+        patch("assay.runner.artifacts.collect_artifacts", return_value=_PASS_BUNDLE),
+        patch("assay.cli.main.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", return_value=_MOCK_PACKET_PATH),
+    ):
+        result = runner.invoke(app, ["run", "--target", "https://example.com"])
+    assert "packet:" in result.output
+
+
+def test_run_writer_error_exits_1() -> None:
+    with (
+        patch("assay.runner.runner.run", return_value=_MOCK_RUN_RESULT),
+        patch("assay.runner.artifacts.collect_artifacts", return_value=_PASS_BUNDLE),
+        patch("assay.formatter.formatter.format_packet", return_value=_MOCK_PACKET),
+        patch("assay.cli.main.write_packet", side_effect=OSError("disk full")),
+    ):
+        result = runner.invoke(app, ["run", "--target", "https://example.com"])
+    assert result.exit_code == 1
