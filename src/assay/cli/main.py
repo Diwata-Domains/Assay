@@ -324,6 +324,35 @@ def schedule_remove(
     typer.echo(f"removed: {schedule_id}")
 
 
+@schedule_app.command("start")
+def schedule_start(ctx: typer.Context) -> None:
+    """Start the scheduler as a background daemon."""
+    from assay.schedule.daemon import start
+
+    start(config_path=None)
+
+
+@schedule_app.command("stop")
+def schedule_stop() -> None:
+    """Stop the running background scheduler daemon."""
+    from assay.schedule.daemon import stop
+
+    stop()
+
+
+@schedule_app.command("status")
+def schedule_status() -> None:
+    """Show whether the background scheduler daemon is running."""
+    from assay.schedule.daemon import status
+
+    info = status()
+    if info["running"]:
+        typer.echo(f"running (pid {info['pid']})")
+    else:
+        typer.echo("stopped")
+    typer.echo(f"log: {info['log_file']}")
+
+
 # ---------------------------------------------------------------------------
 # key subcommands
 # ---------------------------------------------------------------------------
