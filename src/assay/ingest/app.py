@@ -38,6 +38,7 @@ class IngestPayload(BaseModel):
     user_agent: str
     screenshot: str
     user_comment: str | None = None
+    task_id: str | None = None
     metadata: dict[str, Any] = {}
 
     @field_validator("captured_at")
@@ -98,6 +99,8 @@ async def ingest(
     _key: str = Depends(_require_api_key),
 ) -> dict[str, str]:
     packet = format_sdk_packet(payload)
+    if payload.task_id:
+        packet["task_id"] = payload.task_id
     output_dir = request.app.state.output_dir
     verification_id = str(packet["verification_id"])
     screenshot_path = _save_screenshot(verification_id, payload.screenshot, output_dir)

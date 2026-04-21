@@ -15,7 +15,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule"}
+_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain"}
 
 
 class ConfigError(Exception):
@@ -55,6 +55,12 @@ class ScheduleConfig:
 
 
 @dataclass
+class GrainConfig:
+    project_root: str = ""
+    output_path: str = ""
+
+
+@dataclass
 class AssayConfig:
     project: ProjectConfig = field(default_factory=ProjectConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
@@ -62,6 +68,7 @@ class AssayConfig:
     serve: ServeConfig = field(default_factory=ServeConfig)
     keys: KeysConfig = field(default_factory=KeysConfig)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
+    grain: GrainConfig = field(default_factory=GrainConfig)
 
 
 def _resolve_path(override: str | None) -> Path | None:
@@ -96,6 +103,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     serve = _section("serve")
     keys = _section("keys")
     schedule = _section("schedule")
+    grain = _section("grain")
 
     raw_timeout = runner.get("timeout_seconds", 300)
     raw_port = serve.get("port", 8000)
@@ -117,6 +125,10 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
         ),
         keys=KeysConfig(store=str(keys.get("store", "~/.assay/keys.json"))),
         schedule=ScheduleConfig(store=str(schedule.get("store", "~/.assay/schedules.json"))),
+        grain=GrainConfig(
+            project_root=str(grain.get("project_root", "")),
+            output_path=str(grain.get("output_path", "")),
+        ),
     )
 
 

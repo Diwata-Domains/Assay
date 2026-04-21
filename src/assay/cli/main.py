@@ -68,8 +68,12 @@ def run(
     target: Optional[str] = typer.Option(None, "--target", help="URL or target to test."),  # noqa: UP007
     suite: str = typer.Option("default", "--suite", help="Test suite name."),
     output: Optional[str] = typer.Option(None, "--output", help="Output directory."),  # noqa: UP007
+    task_id: Optional[str] = typer.Option(None, "--task-id", help="Grain task ID to tag this run."),  # noqa: UP007
+    submit: bool = typer.Option(False, "--submit", help="Submit packet to Grain output path after run."),
 ) -> None:
     """Execute a test run using the Playwright + Docker runner."""
+    from assay.grain.detect import detect_task_id
+
     if target is None:
         typer.echo("error: --target is required", err=True)
         raise typer.Exit(2)
@@ -77,6 +81,11 @@ def run(
     config: AssayConfig = ctx.obj
     output_dir = output or config.output.directory
     image = config.runner.docker_image
+
+    # Resolve task_id: explicit flag > Grain auto-detect
+    effective_task_id = task_id or detect_task_id(config.grain.project_root or None)
+    if effective_task_id:
+        typer.echo(f"task_id: {effective_task_id}")
 
     runner_result = _runner.run(target, suite=suite, output_dir=output_dir, image=image)
 
@@ -91,7 +100,7 @@ def run(
         typer.echo(f"error: {bundle.error}", err=True)
 
     try:
-        packet = format_packet(bundle)
+        packet = format_packet(bundle, task_id=effective_task_id)
         # Copy screenshot to a stable verification_id-based name in the output dir
         verification_id = str(packet["verification_id"])
         if bundle.screenshot_path:
@@ -106,12 +115,61 @@ def run(
         typer.echo(f"error writing packet: {exc}", err=True)
         raise typer.Exit(1) from exc
 
+    if submit:
+        _do_submit(str(packet_path), config)
+
     if bundle.outcome == "pass":
         raise typer.Exit(0)
     elif bundle.outcome == "fail":
         raise typer.Exit(3)
     else:
         raise typer.Exit(1)
+
+
+def _do_submit(packet_path: str, config: AssayConfig) -> None:
+    """Copy a packet to the configured Grain output path."""
+    import json as _json
+
+    grain_output = config.grain.output_path
+    if not grain_output:
+        typer.echo("error: [grain] output_path not configured", err=True)
+        raise typer.Exit(1)
+
+    try:
+        data = _json.loads(Path(packet_path).read_text())
+    except Exception as exc:
+        typer.echo(f"error reading packet: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    import jsonschema  # type: ignore[import-untyped]
+
+    from assay.schemas import ASSAY_PAYLOAD
+    try:
+        jsonschema.validate(instance=data, schema=ASSAY_PAYLOAD)
+    except jsonschema.ValidationError as exc:
+        typer.echo(f"error: packet schema invalid: {exc.message}", err=True)
+        raise typer.Exit(1) from exc
+
+    dest_dir = Path(grain_output)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / Path(packet_path).name
+    shutil.copy2(packet_path, dest)
+    typer.echo(f"submitted: {dest}")
+
+
+# ---------------------------------------------------------------------------
+# submit
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def submit(
+    ctx: typer.Context,
+    packet: str = typer.Option(..., "--packet", help="Path to the packet JSON file to submit."),
+) -> None:
+    """Validate and submit a packet to the configured Grain output path."""
+    config: AssayConfig = ctx.obj
+    _do_submit(packet, config)
 
 
 # ---------------------------------------------------------------------------
