@@ -15,7 +15,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys"}
+_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule"}
 
 
 class ConfigError(Exception):
@@ -50,12 +50,18 @@ class KeysConfig:
 
 
 @dataclass
+class ScheduleConfig:
+    store: str = "~/.assay/schedules.json"
+
+
+@dataclass
 class AssayConfig:
     project: ProjectConfig = field(default_factory=ProjectConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     serve: ServeConfig = field(default_factory=ServeConfig)
     keys: KeysConfig = field(default_factory=KeysConfig)
+    schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
 
 
 def _resolve_path(override: str | None) -> Path | None:
@@ -89,6 +95,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     output = _section("output")
     serve = _section("serve")
     keys = _section("keys")
+    schedule = _section("schedule")
 
     raw_timeout = runner.get("timeout_seconds", 300)
     raw_port = serve.get("port", 8000)
@@ -109,6 +116,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
             port=raw_port,
         ),
         keys=KeysConfig(store=str(keys.get("store", "~/.assay/keys.json"))),
+        schedule=ScheduleConfig(store=str(schedule.get("store", "~/.assay/schedules.json"))),
     )
 
 

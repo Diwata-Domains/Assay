@@ -2,10 +2,28 @@
 name = "assay"
 version = "0.1.0"
 description = "Independent verification layer for software projects"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Shaznay Sison" }]
+keywords = ["testing", "verification", "playwright", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+]
 requires-python = ">=3.11"
 dependencies = [
+    "apscheduler>=3.10",
+    "bcrypt>=4.1",
+    "fastapi>=0.111",
     "jsonschema>=4.23",
     "typer>=0.12",
+    "uvicorn>=0.29",
 ]
 
 [project.scripts]
@@ -13,9 +31,10 @@ assay = "assay.cli.main:app"
 
 [project.optional-dependencies]
 dev = [
-    "ruff",
+    "httpx>=0.27",
     "mypy",
     "pytest",
+    "ruff",
 ]
 
 [build-system]
