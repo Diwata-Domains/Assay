@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
+import shutil
+from pathlib import Path
+from typing import Optional, cast
 
 import typer
 
@@ -90,6 +92,14 @@ def run(
 
     try:
         packet = format_packet(bundle)
+        # Copy screenshot to a stable verification_id-based name in the output dir
+        verification_id = str(packet["verification_id"])
+        if bundle.screenshot_path:
+            src = Path(bundle.screenshot_path)
+            if src.exists():
+                dest = Path(output_dir) / f"{verification_id}.png"
+                shutil.copy2(src, dest)
+                packet["artifact_refs"] = [str(dest)]
         packet_path = write_packet(packet, output_dir)
         typer.echo(f"packet: {packet_path}")
     except Exception as exc:
@@ -136,10 +146,54 @@ def serve(
 def report(
     output: str = typer.Option("./assay-output", "--output", help="Directory to read packets from."),
     format: str = typer.Option("text", "--format", help="Output format: text or json."),
+    filter: Optional[str] = typer.Option(None, "--filter", help="Filter packets, e.g. outcome=fail."),  # noqa: UP007
 ) -> None:
-    """Display or export task packet summaries."""
-    typer.echo(_NOT_IMPLEMENTED)
-    raise typer.Exit(1)
+    """Display task packet summaries from the output directory."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    out = _Path(output)
+    if not out.is_dir():
+        typer.echo(f"error: output directory not found: {output}", err=True)
+        raise typer.Exit(1)
+
+    packets = []
+    for path in sorted(out.glob("assay-*.json")):
+        try:
+            data: dict[str, object] = _json.loads(path.read_text())
+        except Exception:
+            continue
+        packets.append(data)
+
+    # Apply --filter key=value
+    if filter:
+        if "=" not in filter:
+            typer.echo("error: --filter must be in key=value form", err=True)
+            raise typer.Exit(2)
+        fkey, fval = filter.split("=", 1)
+        packets = [p for p in packets if str(p.get(fkey, "")) == fval]
+
+    if format == "json":
+        typer.echo(_json.dumps(packets, indent=2))
+        raise typer.Exit(0)
+
+    if not packets:
+        typer.echo("no packets found")
+        raise typer.Exit(0)
+
+    # Text table
+    col = "{:<36}  {:<13}  {:<8}  {:<10}  {:<10}  {}"
+    typer.echo(col.format("verification_id", "outcome", "severity", "screenshot", "verified_at", "summary"))
+    typer.echo("-" * 120)
+    for p in packets:
+        vid = str(p.get("verification_id", ""))[:36]
+        outcome = str(p.get("outcome", ""))
+        severity = str(p.get("severity", ""))
+        refs = cast(list[object], p.get("artifact_refs", []))
+        has_screenshot = "yes" if any(str(r).endswith(".png") for r in refs) else "no"
+        verified_at = str(p.get("verified_at", ""))[:10]
+        summary = str(p.get("summary", ""))
+        typer.echo(col.format(vid, outcome, severity, has_screenshot, verified_at, summary))
 
 
 # ---------------------------------------------------------------------------

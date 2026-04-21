@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -81,6 +82,15 @@ def _require_api_key(request: Request, x_assay_key: str | None = Header(default=
     return x_assay_key
 
 
+def _save_screenshot(verification_id: str, screenshot_b64: str, output_dir: str) -> str:
+    """Decode base64 screenshot and write to <output_dir>/<verification_id>.png. Returns file path."""
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{verification_id}.png"
+    path.write_bytes(base64.b64decode(screenshot_b64))
+    return str(path)
+
+
 @app.post("/ingest")
 async def ingest(
     request: Request,
@@ -88,5 +98,9 @@ async def ingest(
     _key: str = Depends(_require_api_key),
 ) -> dict[str, str]:
     packet = format_sdk_packet(payload)
-    write_packet(packet, request.app.state.output_dir)
+    output_dir = request.app.state.output_dir
+    verification_id = str(packet["verification_id"])
+    screenshot_path = _save_screenshot(verification_id, payload.screenshot, output_dir)
+    packet["artifact_refs"] = [screenshot_path]
+    write_packet(packet, output_dir)
     return {"status": "accepted"}

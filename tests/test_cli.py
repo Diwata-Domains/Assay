@@ -1,5 +1,6 @@
 """CLI entrypoint tests."""
 
+import pytest
 from typer.testing import CliRunner
 
 from assay import __version__
@@ -39,10 +40,9 @@ def test_serve_starts_uvicorn() -> None:
     assert mock_run.called
 
 
-def test_report_stub() -> None:
-    result = runner.invoke(app, ["report"])
+def test_report_no_packets(tmp_path: pytest.TempPathFactory) -> None:
+    result = runner.invoke(app, ["report", "--output", "./nonexistent-assay-output-dir-xyz"])
     assert result.exit_code == 1
-    assert "not implemented" in result.output
 
 
 
