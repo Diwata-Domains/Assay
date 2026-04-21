@@ -7,7 +7,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import bcrypt
 
@@ -42,7 +42,7 @@ def create_key(store_path: str, label: Optional[str] = None) -> str:  # noqa: UP
     """
     path = Path(store_path).expanduser()
     data = _load(path)
-    keys: list[dict[str, object]] = list(data.get("keys", []))  # type: ignore[arg-type]
+    keys: list[dict[str, object]] = cast(list[dict[str, object]], data.get("keys", []))
 
     raw = secrets.token_urlsafe(32)
     hashed = bcrypt.hashpw(raw.encode(), bcrypt.gensalt()).decode()
@@ -67,7 +67,7 @@ def list_keys(store_path: str) -> list[dict[str, object]]:
     """Return all key entries (id, label, created_at, revoked) — no hashes."""
     path = Path(store_path).expanduser()
     data = _load(path)
-    keys: list[dict[str, object]] = list(data.get("keys", []))  # type: ignore[arg-type]
+    keys: list[dict[str, object]] = cast(list[dict[str, object]], data.get("keys", []))
     return [
         {
             "id": k["id"],
@@ -84,7 +84,7 @@ def revoke_key(store_path: str, key_id: str) -> None:
     """Mark a key as revoked. Raises KeyStoreError if the ID is not found."""
     path = Path(store_path).expanduser()
     data = _load(path)
-    keys: list[dict[str, object]] = list(data.get("keys", []))  # type: ignore[arg-type]
+    keys: list[dict[str, object]] = cast(list[dict[str, object]], data.get("keys", []))
 
     for key in keys:
         if key["id"] == key_id:
@@ -103,7 +103,7 @@ def verify_key(store_path: str, raw: str) -> bool:
     """Return True if raw matches any active (non-revoked) key hash."""
     path = Path(store_path).expanduser()
     data = _load(path)
-    keys: list[dict[str, object]] = list(data.get("keys", []))  # type: ignore[arg-type]
+    keys: list[dict[str, object]] = cast(list[dict[str, object]], data.get("keys", []))
 
     for key in keys:
         if key.get("revoked"):
