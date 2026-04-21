@@ -2,19 +2,35 @@
   "name": "@assay/sdk",
   "version": "0.1.0",
   "description": "Assay browser SDK — capture screenshots and metadata for verification",
+  "author": "Shaznay Sison",
+  "license": "MIT",
+  "keywords": ["assay", "testing", "screenshot", "verification", "playwright"],
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "types": "./dist/esm/index.d.ts"
+    }
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --outDir dist/esm && tsc -p tsconfig.cjs.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/jsdom": "^28.0.1",
+    "jsdom": "^27.0.1",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1"
   }
 }
