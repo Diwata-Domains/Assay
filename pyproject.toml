@@ -1,5 +1,5 @@
 [project]
-name = "assay"
+name = "assay-kit"
 version = "0.1.0"
 description = "Independent verification layer for software projects"
 readme = "README.md"

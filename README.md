@@ -11,7 +11,7 @@ Independent verification layer for software projects. Assay runs Playwright-base
 ## Install
 
 ```bash
-pip install assay
+pip install assay-kit
 ```
 
 Or from source:
