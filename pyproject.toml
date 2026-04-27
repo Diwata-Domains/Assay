@@ -1,0 +1,66 @@
+[project]
+name = "assay-kit"
+version = "0.1.0"
+description = "Independent verification layer for software projects"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Shaznay Sison" }]
+keywords = ["testing", "verification", "playwright", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "apscheduler>=3.10",
+    "bcrypt>=4.1",
+    "fastapi>=0.111",
+    "jsonschema>=4.23",
+    "typer>=0.12",
+    "uvicorn>=0.29",
+]
+
+[project.scripts]
+assay = "assay.cli.main:app"
+
+[project.optional-dependencies]
+dev = [
+    "anyio[trio]>=4.0",
+    "httpx>=0.27",
+    "jsonschema>=4.23",
+    "mypy",
+    "pytest",
+    "ruff",
+    "typer>=0.12",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+src = ["src"]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+strict = true
+packages = ["assay"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv.scripts]
+test = "pytest"
+lint = "ruff check ."

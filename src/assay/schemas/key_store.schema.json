@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "assay:key_store",
+  "title": "API Key Store",
+  "description": "Local key store at ~/.assay/keys.json. Raw key values are never stored — only bcrypt hashes.",
+  "type": "object",
+  "required": ["version", "keys"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version. Current value: \"1\"."
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "hash", "created_at", "revoked"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "UUID v4 key identifier."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label for the key."
+          },
+          "hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "bcrypt hash of the raw API key. Never the raw value."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 creation timestamp."
+          },
+          "revoked": {
+            "type": "boolean",
+            "description": "True if the key has been revoked."
+          },
+          "revoked_at": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "ISO 8601 revocation timestamp. Null if key is active."
+          }
+        }
+      }
+    }
+  }
+}
