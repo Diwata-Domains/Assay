@@ -203,8 +203,9 @@ def serve(
 @app.command()
 def report(
     output: str = typer.Option("./assay-output", "--output", help="Directory to read packets from."),
-    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+    format: str = typer.Option("text", "--format", help="Output format: text, json, or html."),
     filter: Optional[str] = typer.Option(None, "--filter", help="Filter packets, e.g. outcome=fail."),  # noqa: UP007
+    open: bool = typer.Option(False, "--open", help="Open the report in the default browser (html only)."),
 ) -> None:
     """Display task packet summaries from the output directory."""
     import json as _json
@@ -231,17 +232,25 @@ def report(
         fkey, fval = filter.split("=", 1)
         packets = [p for p in packets if str(p.get(fkey, "")) == fval]
 
+    if open and format != "html":
+        typer.echo("warning: --open is only supported with --format html")
+
     if format == "json":
         typer.echo(_json.dumps(packets, indent=2))
         raise typer.Exit(0)
 
     if format == "html":
+        import webbrowser
+
         from assay.formatter.html_formatter import render_html
 
         html = render_html(packets)
         dest = _Path("assay-report.html")
         dest.write_text(html, encoding="utf-8")
-        typer.echo(f"report: {dest.resolve()}")
+        resolved = str(dest.resolve())
+        typer.echo(f"report: {resolved}")
+        if open:
+            webbrowser.open(f"file://{resolved}")
         raise typer.Exit(0)
 
     if not packets:
