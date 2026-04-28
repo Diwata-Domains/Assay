@@ -235,6 +235,15 @@ def report(
         typer.echo(_json.dumps(packets, indent=2))
         raise typer.Exit(0)
 
+    if format == "html":
+        from assay.formatter.html_formatter import render_html
+
+        html = render_html(packets)
+        dest = _Path("assay-report.html")
+        dest.write_text(html, encoding="utf-8")
+        typer.echo(f"report: {dest.resolve()}")
+        raise typer.Exit(0)
+
     if not packets:
         typer.echo("no packets found")
         raise typer.Exit(0)
