@@ -112,8 +112,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 | ID | Task | Status | Dependencies | Notes |
 |----|------|--------|--------------|-------|
-| P14-T01 | `assay report --format html`: single-file HTML with inline screenshots | pending | P11-T03 | base64-embedded PNGs; self-contained file |
-| P14-T02 | `assay report --format html --open`: auto-open in default browser | pending | P14-T01 | |
+| P14-T01 | `assay report --format html`: single-file HTML with inline screenshots | done | P11-T03 | base64-embedded PNGs; self-contained file |
+| P14-T02 | `assay report --format html --open`: auto-open in default browser | ready | P14-T01 | TASK-0033 |
 
 ---
 
