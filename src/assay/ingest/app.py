@@ -18,6 +18,7 @@ app = FastAPI(title="Assay Ingest")
 # Overridable via app.state for tests
 app.state.key_store = "~/.assay/keys.json"
 app.state.output_dir = "./assay-output"
+app.state.store_db = "~/.assay/store.db"
 
 
 class Viewport(BaseModel):
@@ -106,4 +107,19 @@ async def ingest(
     screenshot_path = _save_screenshot(verification_id, payload.screenshot, output_dir)
     packet["artifact_refs"] = [screenshot_path]
     write_packet(packet, output_dir)
+    _store_ingest_packet(packet, request.app.state.store_db)
     return {"status": "accepted"}
+
+
+def _store_ingest_packet(packet: dict[str, object], store_db: str) -> None:
+    from pathlib import Path as _Path
+
+    from assay.store.db import init_db
+    from assay.store.db import insert_packet as _insert
+
+    db_path = _Path(store_db).expanduser()
+    try:
+        init_db(db_path)
+        _insert(packet, db_path)
+    except Exception:
+        pass

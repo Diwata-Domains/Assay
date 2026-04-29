@@ -15,7 +15,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain"}
+_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain", "store"}
 
 
 class ConfigError(Exception):
@@ -61,6 +61,11 @@ class GrainConfig:
 
 
 @dataclass
+class StoreConfig:
+    db: str = "~/.assay/store.db"
+
+
+@dataclass
 class AssayConfig:
     project: ProjectConfig = field(default_factory=ProjectConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
@@ -69,6 +74,7 @@ class AssayConfig:
     keys: KeysConfig = field(default_factory=KeysConfig)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     grain: GrainConfig = field(default_factory=GrainConfig)
+    store: StoreConfig = field(default_factory=StoreConfig)
 
 
 def _resolve_path(override: str | None) -> Path | None:
@@ -104,6 +110,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     keys = _section("keys")
     schedule = _section("schedule")
     grain = _section("grain")
+    store = _section("store")
 
     raw_timeout = runner.get("timeout_seconds", 300)
     raw_port = serve.get("port", 8000)
@@ -129,6 +136,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
             project_root=str(grain.get("project_root", "")),
             output_path=str(grain.get("output_path", "")),
         ),
+        store=StoreConfig(db=str(store.get("db", "~/.assay/store.db"))),
     )
 
 
