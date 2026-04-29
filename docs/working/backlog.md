@@ -112,8 +112,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 | ID | Task | Status | Dependencies | Notes |
 |----|------|--------|--------------|-------|
-| P14-T01 | `assay report --format html`: single-file HTML with inline screenshots | done | P11-T03 | base64-embedded PNGs; self-contained file |
-| P14-T02 | `assay report --format html --open`: auto-open in default browser | ready | P14-T01 | TASK-0033 |
+| P14-T01 | `assay report --format html`: single-file HTML with inline screenshots | done | P11-T03 | TASK-0032 |
+| P14-T02 | `assay report --format html --open`: auto-open in default browser | done | P14-T01 | TASK-0033 |
 
 ---
 
@@ -121,7 +121,7 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 | ID | Task | Status | Dependencies | Notes |
 |----|------|--------|--------------|-------|
-| P15-T01 | `assay run --watch`: re-run on file/path change | pending | P3 complete | watchdog or polling; debounce 500ms |
+| P15-T01 | `assay run --watch`: re-run on file/path change | ready | P3 complete | TASK-0034; watchdog or polling; debounce 500ms |
 | P15-T02 | `--watch-path <glob>` option for file-based trigger | pending | P15-T01 | |
 
 ---

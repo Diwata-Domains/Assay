@@ -70,6 +70,8 @@ def run(
     output: Optional[str] = typer.Option(None, "--output", help="Output directory."),  # noqa: UP007
     task_id: Optional[str] = typer.Option(None, "--task-id", help="Grain task ID to tag this run."),  # noqa: UP007
     submit: bool = typer.Option(False, "--submit", help="Submit packet to Grain output path after run."),
+    watch: bool = typer.Option(False, "--watch", help="Re-run on file changes (Ctrl+C to exit)."),
+    watch_path: str = typer.Option(".", "--watch-path", help="Directory to watch for changes (default: current dir)."),
 ) -> None:
     """Execute a test run using the Playwright + Docker runner."""
     from assay.grain.detect import detect_task_id
@@ -87,43 +89,57 @@ def run(
     if effective_task_id:
         typer.echo(f"task_id: {effective_task_id}")
 
-    runner_result = _runner.run(target, suite=suite, output_dir=output_dir, image=image)
+    def _do_run() -> str:
+        runner_result = _runner.run(target, suite=suite, output_dir=output_dir, image=image)
+        try:
+            bundle = _artifacts.collect_artifacts(runner_result.output_dir, runner_result)
+        except _artifacts.ArtifactError as exc:
+            typer.echo(f"error reading artifacts: {exc}", err=True)
+            raise typer.Exit(1) from exc
+        typer.echo(f"outcome: {bundle.outcome}")
+        if bundle.error:
+            typer.echo(f"error: {bundle.error}", err=True)
+        try:
+            packet = format_packet(bundle, task_id=effective_task_id)
+            verification_id = str(packet["verification_id"])
+            if bundle.screenshot_path:
+                src = Path(bundle.screenshot_path)
+                if src.exists():
+                    dest = Path(output_dir) / f"{verification_id}.png"
+                    shutil.copy2(src, dest)
+                    packet["artifact_refs"] = [str(dest)]
+            packet_path = write_packet(packet, output_dir)
+            typer.echo(f"packet: {packet_path}")
+        except Exception as exc:
+            typer.echo(f"error writing packet: {exc}", err=True)
+            raise typer.Exit(1) from exc
+        if submit:
+            _do_submit(str(packet_path), config)
+        return bundle.outcome
 
+    if not watch:
+        outcome = _do_run()
+        if outcome == "pass":
+            raise typer.Exit(0)
+        elif outcome == "fail":
+            raise typer.Exit(3)
+        else:
+            raise typer.Exit(1)
+
+    from assay.watch.poller import debounce_and_wait, watch_once
+
+    wp = Path(watch_path)
+    typer.echo(f"watching: {wp.resolve()} (Ctrl+C to stop)")
     try:
-        bundle = _artifacts.collect_artifacts(runner_result.output_dir, runner_result)
-    except _artifacts.ArtifactError as exc:
-        typer.echo(f"error reading artifacts: {exc}", err=True)
-        raise typer.Exit(1) from exc
-
-    typer.echo(f"outcome: {bundle.outcome}")
-    if bundle.error:
-        typer.echo(f"error: {bundle.error}", err=True)
-
-    try:
-        packet = format_packet(bundle, task_id=effective_task_id)
-        # Copy screenshot to a stable verification_id-based name in the output dir
-        verification_id = str(packet["verification_id"])
-        if bundle.screenshot_path:
-            src = Path(bundle.screenshot_path)
-            if src.exists():
-                dest = Path(output_dir) / f"{verification_id}.png"
-                shutil.copy2(src, dest)
-                packet["artifact_refs"] = [str(dest)]
-        packet_path = write_packet(packet, output_dir)
-        typer.echo(f"packet: {packet_path}")
-    except Exception as exc:
-        typer.echo(f"error writing packet: {exc}", err=True)
-        raise typer.Exit(1) from exc
-
-    if submit:
-        _do_submit(str(packet_path), config)
-
-    if bundle.outcome == "pass":
+        _do_run()
+        while True:
+            watch_once(wp)
+            debounce_and_wait(wp, debounce_ms=500)
+            typer.echo("--- change detected, re-running ---")
+            _do_run()
+    except KeyboardInterrupt:
+        typer.echo("\nwatch stopped")
         raise typer.Exit(0)
-    elif bundle.outcome == "fail":
-        raise typer.Exit(3)
-    else:
-        raise typer.Exit(1)
 
 
 def _do_submit(packet_path: str, config: AssayConfig) -> None:
