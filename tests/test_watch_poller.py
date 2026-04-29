@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-from assay.watch.poller import debounce_and_wait, watch_once
+from assay.watch.poller import debounce_and_wait, parse_watch_target, watch_once
 
 
 def test_watch_once_returns_on_change(tmp_path: Path) -> None:
@@ -76,8 +76,8 @@ def test_debounce_resets_on_subsequent_change(tmp_path: Path) -> None:
 
     original_snapshot = None
 
-    def patched_snapshot(path: Path) -> dict[str, float]:
-        result = original_snapshot(path)
+    def patched_snapshot(path: Path, glob: str | None = None) -> dict[str, float]:
+        result = original_snapshot(path, glob)
         if len(change_times) == 0:
             change_times.append(time.monotonic())
             result["__fake__"] = float(len(change_times))
@@ -92,3 +92,84 @@ def test_debounce_resets_on_subsequent_change(tmp_path: Path) -> None:
         elapsed = time.monotonic() - start
 
     assert elapsed >= 0.06
+
+
+# ---------------------------------------------------------------------------
+# parse_watch_target tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_plain_path_returns_no_glob() -> None:
+    base, glob = parse_watch_target("src")
+    assert base == Path("src")
+    assert glob is None
+
+
+def test_parse_dot_returns_no_glob() -> None:
+    base, glob = parse_watch_target(".")
+    assert glob is None
+
+
+def test_parse_glob_star_star() -> None:
+    base, glob = parse_watch_target("src/**/*.py")
+    assert base == Path("src")
+    assert glob == "**/*.py"
+
+
+def test_parse_glob_single_star() -> None:
+    base, glob = parse_watch_target("tests/*.ts")
+    assert base == Path("tests")
+    assert glob == "*.ts"
+
+
+def test_parse_glob_no_base() -> None:
+    base, glob = parse_watch_target("**/*.py")
+    assert base == Path(".")
+    assert glob == "**/*.py"
+
+
+# ---------------------------------------------------------------------------
+# glob-filtered snapshot / watch tests
+# ---------------------------------------------------------------------------
+
+
+def test_glob_filters_to_matching_files(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("py")
+    (tmp_path / "app.js").write_text("js")
+
+    triggered = []
+
+    def trigger() -> None:
+        time.sleep(0.05)
+        (tmp_path / "app.py").write_text("changed")
+
+    import threading
+    t = threading.Thread(target=trigger)
+    t.start()
+    watch_once(tmp_path, glob="*.py", poll_interval_ms=20)
+    triggered.append(True)
+    t.join()
+    assert triggered
+
+
+def test_glob_ignores_non_matching_files(tmp_path: Path) -> None:
+    py_file = tmp_path / "app.py"
+    js_file = tmp_path / "app.js"
+    py_file.write_text("stable")
+    js_file.write_text("stable")
+
+    calls: list[int] = []
+    original_sleep = time.sleep
+
+    def counting_sleep(secs: float) -> None:
+        calls.append(1)
+        if len(calls) == 3:
+            js_file.write_text("changed js")
+        if len(calls) >= 5:
+            py_file.write_text("changed py")
+        original_sleep(secs)
+
+    with patch("assay.watch.poller.time.sleep", side_effect=counting_sleep):
+        watch_once(tmp_path, glob="*.py", poll_interval_ms=10)
+
+    assert len(calls) >= 5

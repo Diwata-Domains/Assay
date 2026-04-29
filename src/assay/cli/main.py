@@ -126,15 +126,16 @@ def run(
         else:
             raise typer.Exit(1)
 
-    from assay.watch.poller import debounce_and_wait, watch_once
+    from assay.watch.poller import debounce_and_wait, parse_watch_target, watch_once
 
-    wp = Path(watch_path)
-    typer.echo(f"watching: {wp.resolve()} (Ctrl+C to stop)")
+    wp, watch_glob = parse_watch_target(watch_path)
+    label = str(wp.resolve()) + (f"/{watch_glob}" if watch_glob else "")
+    typer.echo(f"watching: {label} (Ctrl+C to stop)")
     try:
         _do_run()
         while True:
-            watch_once(wp)
-            debounce_and_wait(wp, debounce_ms=500)
+            watch_once(wp, glob=watch_glob)
+            debounce_and_wait(wp, debounce_ms=500, glob=watch_glob)
             typer.echo("--- change detected, re-running ---")
             _do_run()
     except KeyboardInterrupt:

@@ -44,7 +44,7 @@ def _mock_packet() -> dict[str, object]:
 def test_watch_flag_runs_initial_then_stops_on_ctrl_c(mock_run, mock_collect, mock_fmt, mock_write, tmp_path):  # type: ignore[no-untyped-def]
     call_count = 0
 
-    def fake_watch_once(path: Path, poll_interval_ms: int = 200) -> None:
+    def fake_watch_once(path: Path, glob: str | None = None, poll_interval_ms: int = 200) -> None:
         nonlocal call_count
         call_count += 1
         if call_count >= 1:
@@ -68,7 +68,7 @@ def test_watch_flag_runs_initial_then_stops_on_ctrl_c(mock_run, mock_collect, mo
 def test_watch_reruns_on_change(mock_run, mock_collect, mock_fmt, mock_write, tmp_path):  # type: ignore[no-untyped-def]
     call_count = 0
 
-    def fake_watch_once(path: Path, poll_interval_ms: int = 200) -> None:
+    def fake_watch_once(path: Path, glob: str | None = None, poll_interval_ms: int = 200) -> None:
         nonlocal call_count
         call_count += 1
         if call_count >= 2:
@@ -106,3 +106,40 @@ def test_watch_prints_watching_path(mock_run, mock_collect, mock_fmt, mock_write
                 app, ["run", "--target", "https://example.com", "--watch", "--watch-path", str(tmp_path)]
             )
     assert "watching:" in result.output
+
+
+@patch("assay.cli.main.write_packet", return_value=Path("/tmp/out/assay-test.json"))
+@patch("assay.cli.main.format_packet", return_value=_mock_packet())
+@patch("assay.cli.main._artifacts.collect_artifacts", return_value=_mock_bundle("pass"))
+@patch("assay.cli.main._runner.run", return_value=_PASS_RESULT)
+def test_glob_watch_path_shows_pattern_in_output(mock_run, mock_collect, mock_fmt, mock_write, tmp_path):  # type: ignore[no-untyped-def]
+    glob_path = str(tmp_path) + "/**/*.py"
+    with patch("assay.watch.poller.watch_once", side_effect=KeyboardInterrupt):
+        with patch("assay.watch.poller.debounce_and_wait"):
+            result = runner.invoke(
+                app, ["run", "--target", "https://example.com", "--watch", "--watch-path", glob_path]
+            )
+    assert "watching:" in result.output
+    assert "**/*.py" in result.output
+
+
+@patch("assay.cli.main.write_packet", return_value=Path("/tmp/out/assay-test.json"))
+@patch("assay.cli.main.format_packet", return_value=_mock_packet())
+@patch("assay.cli.main._artifacts.collect_artifacts", return_value=_mock_bundle("pass"))
+@patch("assay.cli.main._runner.run", return_value=_PASS_RESULT)
+def test_glob_watch_path_passes_glob_to_poller(mock_run, mock_collect, mock_fmt, mock_write, tmp_path):  # type: ignore[no-untyped-def]
+    glob_path = str(tmp_path) + "/**/*.py"
+    captured: list[dict[str, object]] = []
+
+    def fake_watch_once(path: Path, glob: str | None = None, poll_interval_ms: int = 200) -> None:
+        captured.append({"path": path, "glob": glob})
+        raise KeyboardInterrupt
+
+    with patch("assay.watch.poller.watch_once", side_effect=fake_watch_once):
+        with patch("assay.watch.poller.debounce_and_wait"):
+            runner.invoke(
+                app, ["run", "--target", "https://example.com", "--watch", "--watch-path", glob_path]
+            )
+
+    assert len(captured) == 1
+    assert captured[0]["glob"] == "**/*.py"
