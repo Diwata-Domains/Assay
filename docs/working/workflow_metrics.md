@@ -305,3 +305,33 @@
 - **Pending CPs:** CP-002 (rename sentinel→assay in data_contracts.md), CP-003 (add schedule run to CLI spec)
 
 ---
+
+### Phase 14 — HTML Report — CLOSED 2026-04-28
+
+#### Task Summary
+| Task | Status | Notes |
+|------|--------|-------|
+| P14-T01 assay report --format html | done | TASK-0032; inline base64 screenshots; 11 tests |
+| P14-T02 --open flag | done | TASK-0033; webbrowser.open; 5 tests |
+
+#### Phase Health
+- **Tasks completed:** 2
+- **Tests at phase close:** 266 pytest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---
+
+### Phase 15 — Watch Mode — CLOSED 2026-04-29
+
+#### Task Summary
+| Task | Status | Notes |
+|------|--------|-------|
+| P15-T01 assay run --watch | done | TASK-0034; polling, 500ms debounce, Ctrl+C exit; 9 tests |
+| P15-T02 --watch-path glob support | done | TASK-0035; parse_watch_target, pathlib.glob filter; 9 new tests |
+
+#### Phase Health
+- **Tasks completed:** 2
+- **Tests at phase close:** 284 pytest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---

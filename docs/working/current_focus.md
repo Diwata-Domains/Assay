@@ -1,9 +1,9 @@
 # Current Focus
 
 ## Current Phase
-Phase 15 — Watch Mode
+Phase 16 — SQLite Output Store
 
-<!-- grain-phase-closed: 14 -->
+Phase 14 closed: 2026-04-28 — 2 tasks done (grain-verified)
 
 ---
 
@@ -32,3 +32,5 @@ v0.3.0 planned:
 - `assay schedule start` uses `os.fork()` — POSIX only (no Windows support)
 - Phase 17 (web UI) depends on Phase 16 (SQLite) being complete first
 - Grain has no `grain verify ingest` command yet — submitted packets sit unread (logged in tooling_notes.md)
+
+Phase 15 closed: 2026-04-29 — 2 tasks done (grain-verified)

@@ -108,33 +108,56 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ---
 
-## Phase 14 — HTML Report
+## 14. Phase 14 — HTML Report
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P14-T01 | `assay report --format html`: single-file HTML with inline screenshots | done | P11-T03 | TASK-0032 |
-| P14-T02 | `assay report --format html --open`: auto-open in default browser | done | P14-T01 | TASK-0033 |
+### P14-T01 — assay report --format html: single-file HTML with inline screenshots
 
----
+- **Status:** done
+- **Task ID:** TASK-0032
 
-## Phase 15 — Watch Mode
+### P14-T02 — assay report --format html --open: auto-open in default browser
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P15-T01 | `assay run --watch`: re-run on file/path change | done | P3 complete | TASK-0034 |
-| P15-T02 | `--watch-path <glob>` option for file-based trigger | ready | P15-T01 | TASK-0035 |
+- **Status:** done
+- **Task ID:** TASK-0033
 
 ---
 
-## Phase 16 — SQLite Output Store
+## 15. Phase 15 — Watch Mode
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P16-T01 | SQLite schema + `assay store` module | pending | P4 complete | `~/.assay/store.db` default; `packets` table |
-| P16-T02 | Write packets to SQLite on `assay run` and `/ingest` | pending | P16-T01 | replaces flat JSON write |
-| P16-T03 | `assay report` reads from SQLite; `--filter` and `--format` preserved | pending | P16-T01, P11-T03 | |
-| P16-T04 | `assay report --export json`: backwards-compatible dump | pending | P16-T03 | |
-| P16-T05 | `assay store import --dir <path>`: import existing assay-*.json files | pending | P16-T01 | migration path |
+### P15-T01 — assay run --watch: re-run on file/path change
+
+- **Status:** done
+- **Task ID:** TASK-0034
+
+### P15-T02 — --watch-path glob option for file-based trigger
+
+- **Status:** done
+- **Task ID:** TASK-0035
+
+---
+
+## 16. Phase 16 — SQLite Output Store
+
+### P16-T01 — SQLite schema and assay store module
+
+- **Status:** ready
+- **Task ID:** TASK-0036
+
+### P16-T02 — Write packets to SQLite on assay run and /ingest
+
+- **Status:** pending
+
+### P16-T03 — assay report reads from SQLite with filter and format preserved
+
+- **Status:** pending
+
+### P16-T04 — assay report --export json: backwards-compatible dump
+
+- **Status:** pending
+
+### P16-T05 — assay store import --dir: import existing assay JSON files
+
+- **Status:** pending
 
 ---
 
