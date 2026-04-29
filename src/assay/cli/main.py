@@ -110,6 +110,7 @@ def run(
                     packet["artifact_refs"] = [str(dest)]
             packet_path = write_packet(packet, output_dir)
             typer.echo(f"packet: {packet_path}")
+            _store_packet(packet, config)
         except Exception as exc:
             typer.echo(f"error writing packet: {exc}", err=True)
             raise typer.Exit(1) from exc
@@ -141,6 +142,18 @@ def run(
     except KeyboardInterrupt:
         typer.echo("\nwatch stopped")
         raise typer.Exit(0)
+
+
+def _store_packet(packet: dict[str, object], config: AssayConfig) -> None:
+    from assay.store.db import init_db
+    from assay.store.db import insert_packet as _insert
+
+    db_path = Path(config.store.db).expanduser()
+    try:
+        init_db(db_path)
+        _insert(packet, db_path)
+    except Exception:
+        pass
 
 
 def _do_submit(packet_path: str, config: AssayConfig) -> None:
@@ -208,6 +221,7 @@ def serve(
     config: AssayConfig = ctx.obj
     ingest_app.state.key_store = config.keys.store
     ingest_app.state.output_dir = config.output.directory
+    ingest_app.state.store_db = config.store.db
 
     uvicorn.run(ingest_app, host=host, port=port)
 
