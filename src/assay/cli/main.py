@@ -233,27 +233,21 @@ def serve(
 
 @app.command()
 def report(
-    output: str = typer.Option("./assay-output", "--output", help="Directory to read packets from."),
+    ctx: typer.Context,
+    output: str = typer.Option("./assay-output", "--output", help="Output directory (used for html screenshot paths)."),
     format: str = typer.Option("text", "--format", help="Output format: text, json, or html."),
     filter: Optional[str] = typer.Option(None, "--filter", help="Filter packets, e.g. outcome=fail."),  # noqa: UP007
     open: bool = typer.Option(False, "--open", help="Open the report in the default browser (html only)."),
 ) -> None:
-    """Display task packet summaries from the output directory."""
+    """Display task packet summaries from the SQLite store."""
     import json as _json
     from pathlib import Path as _Path
 
-    out = _Path(output)
-    if not out.is_dir():
-        typer.echo(f"error: output directory not found: {output}", err=True)
-        raise typer.Exit(1)
+    from assay.store.db import list_packets
 
-    packets = []
-    for path in sorted(out.glob("assay-*.json")):
-        try:
-            data: dict[str, object] = _json.loads(path.read_text())
-        except Exception:
-            continue
-        packets.append(data)
+    config: AssayConfig = ctx.obj
+    db_path = _Path(config.store.db).expanduser()
+    packets: list[dict[str, object]] = list_packets(db_path)
 
     # Apply --filter key=value
     if filter:

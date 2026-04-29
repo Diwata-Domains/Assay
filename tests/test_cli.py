@@ -1,6 +1,7 @@
 """CLI entrypoint tests."""
 
-import pytest
+from pathlib import Path
+
 from typer.testing import CliRunner
 
 from assay import __version__
@@ -40,9 +41,12 @@ def test_serve_starts_uvicorn() -> None:
     assert mock_run.called
 
 
-def test_report_no_packets(tmp_path: pytest.TempPathFactory) -> None:
-    result = runner.invoke(app, ["report", "--output", "./nonexistent-assay-output-dir-xyz"])
-    assert result.exit_code == 1
+def test_report_no_packets(tmp_path: Path) -> None:
+    cfg = tmp_path / "assay.toml"
+    cfg.write_text(f'[store]\ndb = "{tmp_path}/empty.db"\n')
+    result = runner.invoke(app, ["--config", str(cfg), "report"])
+    assert result.exit_code == 0
+    assert "no packets found" in result.output
 
 
 

@@ -140,16 +140,18 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P16-T01 — SQLite schema and assay store module
 
-- **Status:** ready
+- **Status:** done
 - **Task ID:** TASK-0036
 
 ### P16-T02 — Write packets to SQLite on assay run and /ingest
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0037
 
 ### P16-T03 — assay report reads from SQLite with filter and format preserved
 
-- **Status:** pending
+- **Status:** ready
+- **Task ID:** TASK-0038
 
 ### P16-T04 — assay report --export json: backwards-compatible dump
 
