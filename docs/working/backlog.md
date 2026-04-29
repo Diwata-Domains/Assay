@@ -121,8 +121,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 | ID | Task | Status | Dependencies | Notes |
 |----|------|--------|--------------|-------|
-| P15-T01 | `assay run --watch`: re-run on file/path change | ready | P3 complete | TASK-0034; watchdog or polling; debounce 500ms |
-| P15-T02 | `--watch-path <glob>` option for file-based trigger | pending | P15-T01 | |
+| P15-T01 | `assay run --watch`: re-run on file/path change | done | P3 complete | TASK-0034 |
+| P15-T02 | `--watch-path <glob>` option for file-based trigger | ready | P15-T01 | TASK-0035 |
 
 ---
 
