@@ -238,6 +238,9 @@ def report(
     format: str = typer.Option("text", "--format", help="Output format: text, json, or html."),
     filter: Optional[str] = typer.Option(None, "--filter", help="Filter packets, e.g. outcome=fail."),  # noqa: UP007
     open: bool = typer.Option(False, "--open", help="Open the report in the default browser (html only)."),
+    export: Optional[str] = typer.Option(  # noqa: UP007
+        None, "--export", help="Write matching packets as JSON array to this file path."
+    ),
 ) -> None:
     """Display task packet summaries from the SQLite store."""
     import json as _json
@@ -256,6 +259,10 @@ def report(
             raise typer.Exit(2)
         fkey, fval = filter.split("=", 1)
         packets = [p for p in packets if str(p.get(fkey, "")) == fval]
+
+    if export:
+        _Path(export).write_text(_json.dumps(packets, indent=2), encoding="utf-8")
+        typer.echo(f"exported: {export}")
 
     if open and format != "html":
         typer.echo("warning: --open is only supported with --format html")

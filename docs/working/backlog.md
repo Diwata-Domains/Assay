@@ -155,7 +155,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P16-T04 — assay report --export json: backwards-compatible dump
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0039
 
 ### P16-T05 — assay store import --dir: import existing assay JSON files
 
