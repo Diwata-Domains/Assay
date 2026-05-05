@@ -1,5 +1,5 @@
 # Current Task
 
-Task ID: TASK-0042
-Task Path: tasks/P17-T02-TASK-0042/
+Task ID: TASK-0043
+Task Path: tasks/P17-T03-TASK-0043/
 Status: ready

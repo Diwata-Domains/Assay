@@ -196,6 +196,83 @@ a:hover{{text-decoration:underline}}
     return HTMLResponse(content=html)
 
 
+@app.get("/packet/{verification_id}", response_class=HTMLResponse)
+async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
+    import base64 as _b64
+    import json as _json
+
+    from assay.store.db import list_packets as _list
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    all_packets = _list(db_path)
+    packet = next((p for p in all_packets if str(p.get("verification_id", "")) == verification_id), None)
+
+    if packet is None:
+        html_404 = (
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            "<title>Not found — Assay</title>"
+            "<style>body{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}"
+            "a{color:#90caf9}</style></head>"
+            f"<body><h1>404 — packet not found</h1><p>{verification_id}</p>"
+            "<p><a href='/'>← back to dashboard</a></p></body></html>"
+        )
+        return HTMLResponse(content=html_404, status_code=404)
+
+    fields_html = ""
+    skip = {"artifact_refs", "raw"}
+    for key, val in packet.items():
+        if key in skip:
+            continue
+        fields_html += f"<dt>{key}</dt><dd>{val}</dd>"
+
+    screenshot_html = ""
+    refs = packet.get("artifact_refs", [])
+    ref_list = refs if isinstance(refs, list) else []
+    for ref in ref_list:
+        p_path = Path(str(ref))
+        if p_path.suffix == ".png" and p_path.exists():
+            img_b64 = _b64.b64encode(p_path.read_bytes()).decode()
+            screenshot_html = (
+                f'<h2>Screenshot</h2>'
+                f'<img src="data:image/png;base64,{img_b64}" '
+                f'style="max-width:100%;border:1px solid #333">'
+            )
+            break
+
+    raw_str = str(packet.get("raw", ""))
+    try:
+        raw_pretty = _json.dumps(_json.loads(raw_str), indent=2)
+    except Exception:
+        raw_pretty = raw_str
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Packet {verification_id[:8]} — Assay</title>
+<style>
+body{{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}}
+h1,h2{{color:#fff;border-bottom:1px solid #333;padding-bottom:.4rem}}
+dl{{display:grid;grid-template-columns:max-content 1fr;gap:.3rem 1.5rem;margin:1rem 0}}
+dt{{color:#aaa;font-size:.85rem}}
+dd{{margin:0;font-size:.85rem}}
+pre{{background:#111;padding:1rem;border-radius:4px;overflow-x:auto;font-size:.8rem}}
+a{{color:#90caf9;text-decoration:none}}
+a:hover{{text-decoration:underline}}
+</style>
+</head>
+<body>
+<p><a href="/">← dashboard</a></p>
+<h1>Packet {verification_id[:8]}…</h1>
+<dl>{fields_html}</dl>
+{screenshot_html}
+<h2>Raw</h2>
+<pre>{raw_pretty}</pre>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
 def _store_ingest_packet(packet: dict[str, object], store_db: str) -> None:
     from pathlib import Path as _Path
 

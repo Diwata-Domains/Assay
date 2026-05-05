@@ -183,7 +183,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P17-T03 — Packet detail view: full fields + inline screenshot
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0043
 
 ---
 
