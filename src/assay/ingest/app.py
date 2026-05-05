@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, field_validator, model_validator
 
 from assay.formatter.formatter import format_sdk_packet
@@ -109,6 +110,86 @@ async def ingest(
     write_packet(packet, output_dir)
     _store_ingest_packet(packet, request.app.state.store_db)
     return {"status": "accepted"}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request) -> HTMLResponse:
+    from assay.store.db import list_packets as _list
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    packets = _list(db_path)
+
+    total = len(packets)
+    counts: dict[str, int] = {}
+    for p in packets:
+        outcome = str(p.get("outcome", "unknown"))
+        counts[outcome] = counts.get(outcome, 0) + 1
+
+    summary_parts = [f"<span>{total} total</span>"]
+    for outcome in ("pass", "fail", "inconclusive"):
+        n = counts.get(outcome, 0)
+        summary_parts.append(f'<span class="outcome-{outcome}">{n} {outcome}</span>')
+
+    rows = ""
+    if not packets:
+        rows = '<tr><td colspan="6" style="text-align:center">no packets</td></tr>'
+    else:
+        for p in packets:
+            vid = str(p.get("verification_id", ""))
+            outcome = str(p.get("outcome", ""))
+            severity = str(p.get("severity", ""))
+            verified_at = str(p.get("verified_at", ""))[:10]
+            summary = str(p.get("summary", ""))
+            task_id = str(p.get("task_id") or "")
+            rows += (
+                f"<tr>"
+                f'<td><a href="/packet/{vid}">{vid[:8]}…</a></td>'
+                f'<td class="outcome-{outcome}">{outcome}</td>'
+                f"<td>{severity}</td>"
+                f"<td>{task_id}</td>"
+                f"<td>{verified_at}</td>"
+                f"<td>{summary}</td>"
+                f"</tr>"
+            )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assay Dashboard</title>
+<style>
+body{{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}}
+h1{{color:#fff;border-bottom:1px solid #333;padding-bottom:.5rem}}
+.summary{{display:flex;gap:1.5rem;margin:1rem 0;font-size:.95rem}}
+.summary span{{padding:.25rem .75rem;background:#1a1a1a;border-radius:4px}}
+.outcome-pass{{color:#4caf50}}
+.outcome-fail{{color:#f44336}}
+.outcome-inconclusive{{color:#ff9800}}
+table{{border-collapse:collapse;width:100%;margin-top:1rem}}
+th{{text-align:left;padding:.4rem .75rem;background:#1a1a1a;border-bottom:2px solid #333;font-size:.85rem}}
+td{{padding:.35rem .75rem;border-bottom:1px solid #1e1e1e;font-size:.85rem}}
+tr:hover td{{background:#141414}}
+a{{color:#90caf9;text-decoration:none}}
+a:hover{{text-decoration:underline}}
+</style>
+</head>
+<body>
+<h1>Assay Dashboard</h1>
+<div class="summary">{''.join(summary_parts)}</div>
+<table>
+<thead>
+<tr>
+<th>verification_id</th><th>outcome</th><th>severity</th>
+<th>task_id</th><th>verified_at</th><th>summary</th>
+</tr>
+</thead>
+<tbody>
+{rows}
+</tbody>
+</table>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 def _store_ingest_packet(packet: dict[str, object], store_db: str) -> None:
