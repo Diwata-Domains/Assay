@@ -335,3 +335,22 @@
 - **Lint/typecheck at phase close:** clean
 
 ---
+
+### Phase 16
+
+#### Tasks
+
+| Task | Status | Notes |
+|------|--------|-------|
+| P16-T01 SQLite schema and store module | done | TASK-0036; init_db, insert_packet, list_packets, import_packets; WAL mode; 13 tests |
+| P16-T02 write packets on run and /ingest | done | TASK-0037; best-effort writes; 4 integration tests |
+| P16-T03 assay report reads from SQLite | done | TASK-0038; list_packets replaces JSON glob; 6 new tests, updated existing |
+| P16-T04 assay report --export json | done | TASK-0039; orthogonal to --format; 4 tests |
+| P16-T05 assay store import --dir | done | TASK-0040; bulk upsert, skip malformed; 5 tests |
+
+#### Phase Health
+- **Tasks completed:** 5
+- **Tests at phase close:** 315 pytest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---
