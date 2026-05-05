@@ -354,3 +354,20 @@
 - **Lint/typecheck at phase close:** clean
 
 ---
+
+### Phase 17
+
+#### Tasks
+
+| Task | Status | Notes |
+|------|--------|-------|
+| P17-T01 Dashboard route GET / | done | TASK-0041; server-rendered HTML, summary counts, packet table; 5 tests |
+| P17-T02 Packet list screenshot column | done | TASK-0042; yes/no indicator, linked rows; 2 tests |
+| P17-T03 Packet detail GET /packet/{id} | done | TASK-0043; all fields, inline base64 screenshot, 404; 5 tests |
+
+#### Phase Health
+- **Tasks completed:** 3
+- **Tests at phase close:** 327 pytest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---
