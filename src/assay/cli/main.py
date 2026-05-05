@@ -24,9 +24,11 @@ app = typer.Typer(
 )
 schedule_app = typer.Typer(help="Manage scheduled test runs.")
 key_app = typer.Typer(help="Manage API keys for the ingest endpoint.")
+store_app = typer.Typer(help="Manage the SQLite packet store.")
 
 app.add_typer(schedule_app, name="schedule")
 app.add_typer(key_app, name="key")
+app.add_typer(store_app, name="store")
 
 _NOT_IMPLEMENTED = "not implemented"
 
@@ -454,3 +456,40 @@ def key_revoke(
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
     typer.echo(f"revoked: {key_id}")
+
+
+# ---------------------------------------------------------------------------
+# store subcommands
+# ---------------------------------------------------------------------------
+
+
+@store_app.command("import")
+def store_import(
+    ctx: typer.Context,
+    dir: str = typer.Option(..., "--dir", help="Directory containing assay-*.json files to import."),
+) -> None:
+    """Import assay-*.json files from a directory into the SQLite store."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    from assay.store.db import import_packets, init_db
+
+    config: AssayConfig = ctx.obj
+    db_path = _Path(config.store.db).expanduser()
+    init_db(db_path)
+
+    src = _Path(dir)
+    if not src.is_dir():
+        typer.echo(f"error: directory not found: {dir}", err=True)
+        raise typer.Exit(1)
+
+    packets: list[dict[str, object]] = []
+    for path in sorted(src.glob("assay-*.json")):
+        try:
+            data: dict[str, object] = _json.loads(path.read_text())
+            packets.append(data)
+        except Exception as exc:
+            typer.echo(f"warning: skipping {path.name}: {exc}", err=True)
+
+    count = import_packets(packets, db_path)
+    typer.echo(f"imported: {count} packet(s)")

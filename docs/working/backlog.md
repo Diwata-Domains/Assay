@@ -160,7 +160,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P16-T05 — assay store import --dir: import existing assay JSON files
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0040
 
 ---
 
