@@ -75,6 +75,27 @@ def test_dashboard_summary_counts(tmp_path: Path) -> None:
     assert "2 fail" in resp.text
 
 
+def test_dashboard_screenshot_yes(tmp_path: Path) -> None:
+    db = tmp_path / "store.db"
+    init_db(db)
+    png = str(tmp_path / "dddd-0004.png")
+    insert_packet({**_PACKET, "artifact_refs": [png]}, db)
+    client = _setup_app(tmp_path)
+
+    resp = client.get("/")
+    assert "yes" in resp.text
+
+
+def test_dashboard_screenshot_no(tmp_path: Path) -> None:
+    db = tmp_path / "store.db"
+    init_db(db)
+    insert_packet({**_PACKET, "artifact_refs": []}, db)
+    client = _setup_app(tmp_path)
+
+    resp = client.get("/")
+    assert "no" in resp.text
+
+
 def test_ingest_post_still_works_after_dashboard_route(tmp_path: Path) -> None:
     key_file = str(tmp_path / "keys.json")
     raw_key = create_key(key_file)

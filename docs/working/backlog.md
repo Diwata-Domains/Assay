@@ -178,7 +178,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P17-T02 — Packet list view: table with outcome, severity, screenshot, timestamp
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0042
 
 ### P17-T03 — Packet detail view: full fields + inline screenshot
 
