@@ -132,7 +132,7 @@ async def dashboard(request: Request) -> HTMLResponse:
 
     rows = ""
     if not packets:
-        rows = '<tr><td colspan="6" style="text-align:center">no packets</td></tr>'
+        rows = '<tr><td colspan="7" style="text-align:center">no packets</td></tr>'
     else:
         for p in packets:
             vid = str(p.get("verification_id", ""))
@@ -141,11 +141,15 @@ async def dashboard(request: Request) -> HTMLResponse:
             verified_at = str(p.get("verified_at", ""))[:10]
             summary = str(p.get("summary", ""))
             task_id = str(p.get("task_id") or "")
+            refs = p.get("artifact_refs", [])
+            ref_list = refs if isinstance(refs, list) else []
+            has_screenshot = "yes" if any(str(r).endswith(".png") for r in ref_list) else "no"
             rows += (
                 f"<tr>"
                 f'<td><a href="/packet/{vid}">{vid[:8]}…</a></td>'
                 f'<td class="outcome-{outcome}">{outcome}</td>'
                 f"<td>{severity}</td>"
+                f"<td>{has_screenshot}</td>"
                 f"<td>{task_id}</td>"
                 f"<td>{verified_at}</td>"
                 f"<td>{summary}</td>"
@@ -180,7 +184,7 @@ a:hover{{text-decoration:underline}}
 <thead>
 <tr>
 <th>verification_id</th><th>outcome</th><th>severity</th>
-<th>task_id</th><th>verified_at</th><th>summary</th>
+<th>screenshot</th><th>task_id</th><th>verified_at</th><th>summary</th>
 </tr>
 </thead>
 <tbody>
