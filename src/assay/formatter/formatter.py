@@ -43,12 +43,14 @@ def _verified_at(bundle: ArtifactBundle) -> str:
 def format_packet(
     bundle: ArtifactBundle,
     task_id: Optional[str] = None,  # noqa: UP007
+    verification_id: Optional[str] = None,  # noqa: UP007
 ) -> dict[str, object]:
     """Convert an ArtifactBundle into a Grain Sentinel payload dict.
 
     Args:
         bundle: Populated ArtifactBundle from collect_artifacts().
         task_id: Grain TASK-#### ID being verified; None for standalone runs.
+        verification_id: Grain-issued VERIFY-XXXX-NNN ID; generates UUID if None.
 
     Returns:
         Dict conforming to data_contracts.md §1 Grain Sentinel payload schema.
@@ -56,7 +58,7 @@ def format_packet(
     artifact_refs: list[str] = [bundle.screenshot_path] if bundle.screenshot_path else []
 
     return {
-        "verification_id": str(uuid.uuid4()),
+        "verification_id": verification_id if verification_id else str(uuid.uuid4()),
         "task_id": task_id,
         "issue_type": _ISSUE_TYPE_MAP.get(bundle.outcome, "test_failure"),
         "severity": _SEVERITY_MAP.get(bundle.outcome, "warning"),
@@ -68,11 +70,15 @@ def format_packet(
     }
 
 
-def format_sdk_packet(payload: "IngestPayload") -> dict[str, object]:
+def format_sdk_packet(
+    payload: "IngestPayload",
+    verification_id: Optional[str] = None,  # noqa: UP007
+) -> dict[str, object]:
     """Convert a browser SDK IngestPayload into a Grain Sentinel payload dict.
 
     Args:
         payload: Validated IngestPayload from the POST /ingest handler.
+        verification_id: Grain-issued VERIFY-XXXX-NNN ID; generates UUID if None.
 
     Returns:
         Dict conforming to data_contracts.md §1 schema.
@@ -81,7 +87,7 @@ def format_sdk_packet(payload: "IngestPayload") -> dict[str, object]:
     summary = f"SDK capture: {payload.url}" + (f" — {comment}" if comment else "")
 
     return {
-        "verification_id": str(uuid.uuid4()),
+        "verification_id": verification_id if verification_id else str(uuid.uuid4()),
         "task_id": None,
         "issue_type": "screenshot_evidence",
         "severity": "info",

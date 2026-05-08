@@ -71,6 +71,7 @@ def run(
     suite: str = typer.Option("default", "--suite", help="Test suite name."),
     output: Optional[str] = typer.Option(None, "--output", help="Output directory."),  # noqa: UP007
     task_id: Optional[str] = typer.Option(None, "--task-id", help="Grain task ID to tag this run."),  # noqa: UP007
+    verification_id: Optional[str] = typer.Option(None, "--verification-id", help="Grain-issued VERIFY-XXXX-NNN ID."),  # noqa: UP007
     submit: bool = typer.Option(False, "--submit", help="Submit packet to Grain output path after run."),
     watch: bool = typer.Option(False, "--watch", help="Re-run on file changes (Ctrl+C to exit)."),
     watch_path: str = typer.Option(".", "--watch-path", help="Directory to watch for changes (default: current dir)."),
@@ -102,12 +103,12 @@ def run(
         if bundle.error:
             typer.echo(f"error: {bundle.error}", err=True)
         try:
-            packet = format_packet(bundle, task_id=effective_task_id)
-            verification_id = str(packet["verification_id"])
+            packet = format_packet(bundle, task_id=effective_task_id, verification_id=verification_id)
+            vid = str(packet["verification_id"])
             if bundle.screenshot_path:
                 src = Path(bundle.screenshot_path)
                 if src.exists():
-                    dest = Path(output_dir) / f"{verification_id}.png"
+                    dest = Path(output_dir) / f"{vid}.png"
                     shutil.copy2(src, dest)
                     packet["artifact_refs"] = [str(dest)]
             packet_path = write_packet(packet, output_dir)

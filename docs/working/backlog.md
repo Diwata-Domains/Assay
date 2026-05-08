@@ -197,7 +197,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P18-T02 — verification_id idempotency for resubmits
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0045
 
 ### P18-T03 — GET /status/{verification_id} endpoint
 
