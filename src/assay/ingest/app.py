@@ -274,6 +274,28 @@ a:hover{{text-decoration:underline}}
     return HTMLResponse(content=html)
 
 
+@app.get("/status/{verification_id}")
+async def verification_status(verification_id: str, request: Request) -> dict[str, object]:
+    from assay.store.db import list_packets as _list
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    all_packets = _list(db_path)
+    packet = next((p for p in all_packets if str(p.get("verification_id", "")) == verification_id), None)
+
+    if packet is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"status": "not_found"}, status_code=404)  # type: ignore[return-value]
+
+    return {
+        "status": "complete",
+        "verification_id": verification_id,
+        "outcome": str(packet.get("outcome", "")),
+        "verified_at": str(packet.get("verified_at", "")),
+        "task_id": str(packet.get("task_id") or ""),
+        "summary": str(packet.get("summary", "")),
+    }
+
+
 def _store_ingest_packet(packet: dict[str, object], store_db: str) -> None:
     from pathlib import Path as _Path
 
