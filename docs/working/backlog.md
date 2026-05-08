@@ -212,4 +212,5 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P18-T05 — End-to-end integration tests for verify flow
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0048
