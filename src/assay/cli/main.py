@@ -174,6 +174,8 @@ def _do_submit(packet_path: str, config: AssayConfig) -> None:
         typer.echo(f"error reading packet: {exc}", err=True)
         raise typer.Exit(1) from exc
 
+    import re as _re
+
     import jsonschema  # type: ignore[import-untyped]
 
     from assay.schemas import ASSAY_PAYLOAD
@@ -182,6 +184,15 @@ def _do_submit(packet_path: str, config: AssayConfig) -> None:
     except jsonschema.ValidationError as exc:
         typer.echo(f"error: packet schema invalid: {exc.message}", err=True)
         raise typer.Exit(1) from exc
+
+    vid = str(data.get("verification_id", ""))
+    _UUID_RE = _re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", _re.I)
+    if _UUID_RE.match(vid):
+        typer.echo(
+            "warning: verification_id is a UUID — grain verify ingest will reject this packet; "
+            "use --verification-id VERIFY-XXXX-NNN to set the grain-issued ID",
+            err=True,
+        )
 
     dest_dir = Path(grain_output)
     dest_dir.mkdir(parents=True, exist_ok=True)
