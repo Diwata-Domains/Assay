@@ -207,7 +207,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P18-T04 — Harden assay submit and --submit flows
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0047
 
 ### P18-T05 — End-to-end integration tests for verify flow
 
