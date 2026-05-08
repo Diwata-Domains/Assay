@@ -100,7 +100,8 @@ async def ingest(
     payload: IngestPayload,
     _key: str = Depends(_require_api_key),
 ) -> dict[str, str]:
-    packet = format_sdk_packet(payload)
+    meta_vid = str(payload.metadata.get("verification_id", "")) or None
+    packet = format_sdk_packet(payload, verification_id=meta_vid)
     if payload.task_id:
         packet["task_id"] = payload.task_id
     output_dir = request.app.state.output_dir
