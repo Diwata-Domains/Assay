@@ -371,3 +371,22 @@
 - **Lint/typecheck at phase close:** clean
 
 ---
+
+### Phase 18
+
+#### Tasks
+
+| Task | Status | Notes |
+|------|--------|-------|
+| P18-T01 Document Grain-Assay handshake | done | TASK-0044; grain_assay_handshake.md; lifecycle, payload schema, VERIFY-XXXX-NNN gap |
+| P18-T02 verification_id idempotency | done | TASK-0045; --verification-id flag on assay run; ingest metadata passthrough; 5 tests |
+| P18-T03 GET /status/{verification_id} | done | TASK-0046; complete/not_found JSON response from SQLite; 4 tests |
+| P18-T04 Harden submit flows | done | TASK-0047; warn on UUID-shaped verification_id in _do_submit; 3 tests |
+| P18-T05 E2E verify flow integration tests | done | TASK-0048; full loop with grain payload validation; 5 tests |
+
+#### Phase Health
+- **Tasks completed:** 5
+- **Tests at phase close:** 344 pytest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---
