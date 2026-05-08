@@ -1,5 +1,5 @@
 # Current Task
 
-Task ID: none
-Task Path: none
-Status: none
+Task ID: TASK-0044
+Task Path: tasks/P18-T01-TASK-0044/
+Status: ready

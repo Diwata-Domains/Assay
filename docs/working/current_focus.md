@@ -1,7 +1,7 @@
 # Current Focus
 
 ## Current Phase
-Phase 17 — Web UI / Dashboard
+Phase 18 — Grain Integration Loop Closure
 
 Phase 14 closed: 2026-04-28 — 2 tasks done (grain-verified)
 

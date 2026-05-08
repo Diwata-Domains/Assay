@@ -188,13 +188,25 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ---
 
-## Phase 18 — Grain Integration Loop Closure
+## 18. Phase 18 — Grain Integration Loop Closure
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P18-T01 | Document canonical Grain<->Assay handshake for verify submit/status/ingest | pending | P12 complete | align payload and lifecycle expectations with Grain Phase 28 |
-| P18-T02 | Add explicit `verification_id` tracking and idempotency behavior for resubmits | pending | P18-T01 | deterministic status and ingest retries |
-| P18-T03 | Add optional transport mode for Grain `verify submit` compatibility | pending | P18-T01 | file-drop remains default; bridge transport is additive |
-| P18-T04 | Add status endpoint/adapter contract for Grain `verify status` polling | pending | P18-T02, P18-T03 | return `pending`/`complete`/`failed` with stable schema |
-| P18-T05 | Harden `assay submit` and `--submit` flows for packet provenance and duplicate handling | pending | P18-T02 | preserve no-loss local artifacts |
-| P18-T06 | End-to-end integration tests with Grain-style verify flow fixtures | pending | P18-T03, P18-T04, P18-T05 | covers submit -> status -> ingest loop |
+### P18-T01 — Document canonical Grain-Assay handshake
+
+- **Status:** done
+- **Task ID:** TASK-0044
+
+### P18-T02 — verification_id idempotency for resubmits
+
+- **Status:** pending
+
+### P18-T03 — GET /status/{verification_id} endpoint
+
+- **Status:** pending
+
+### P18-T04 — Harden assay submit and --submit flows
+
+- **Status:** pending
+
+### P18-T05 — End-to-end integration tests for verify flow
+
+- **Status:** pending
