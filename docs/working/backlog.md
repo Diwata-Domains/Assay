@@ -231,4 +231,5 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P19-T03 — SDK taskId and verificationId passthrough
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0051
