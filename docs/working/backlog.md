@@ -226,7 +226,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P19-T02 — Smoke-test the Docker runner build and run end-to-end
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0050
 
 ### P19-T03 — SDK taskId and verificationId passthrough
 
