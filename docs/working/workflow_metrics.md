@@ -390,3 +390,20 @@
 - **Lint/typecheck at phase close:** clean
 
 ---
+
+### Phase 19
+
+#### Tasks
+
+| Task | Status | Notes |
+|------|--------|-------|
+| P19-T01 Replace html2canvas with html-to-image | done | TASK-0049; toPng via SVG foreignObject; updated 2 test files; 31 vitest passing |
+| P19-T02 Smoke-test Docker runner end-to-end | done | TASK-0050; build + run against example.com; pass/fail paths confirmed; 18KB PNG valid |
+| P19-T03 SDK taskId and verificationId passthrough | done | TASK-0051; CaptureOptions fields; 4 new tests; 31 vitest passing |
+
+#### Phase Health
+- **Tasks completed:** 3
+- **Tests at phase close:** 344 pytest + 31 vitest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---
