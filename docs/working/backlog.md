@@ -214,3 +214,20 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 - **Status:** done
 - **Task ID:** TASK-0048
+
+---
+
+## 19. Phase 19 — Screenshot Quality + Docker Runner Validation
+
+### P19-T01 — Replace html2canvas with html-to-image in the browser SDK
+
+- **Status:** done
+- **Task ID:** TASK-0049
+
+### P19-T02 — Smoke-test the Docker runner build and run end-to-end
+
+- **Status:** pending
+
+### P19-T03 — SDK taskId and verificationId passthrough
+
+- **Status:** pending
