@@ -257,3 +257,127 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 ### P20-T05 — Deployment config (Dockerfile, docker-compose, nginx, .env.example)
 
 - **Status:** pending
+
+---
+
+## 21. Phase 21 — Visual Regression Testing
+
+### P21-T01 — Baseline capture: mark a packet as the approved baseline for a URL
+
+- **Status:** pending
+
+### P21-T02 — Pixel diff engine: compare new capture against baseline, generate diff image
+
+- **Status:** pending
+
+### P21-T03 — Diff view in dashboard: before/after slider + highlighted regions
+
+- **Status:** pending
+
+### P21-T04 — Approve/reject workflow: accept new baseline or flag as regression
+
+- **Status:** pending
+
+### P21-T05 — assay run --compare: diff against baseline from CLI, exit 1 on regression
+
+- **Status:** pending
+
+---
+
+## 22. Phase 22 — Multi-step Playwright Test Scripts
+
+### P22-T01 — Test script format: define steps (navigate, click, fill, screenshot) in a JS/TS file
+
+- **Status:** pending
+
+### P22-T02 — assay run --script <file>: execute script in Docker runner
+
+- **Status:** pending
+
+### P22-T03 — Script result packet: capture step-by-step screenshots + pass/fail per step
+
+- **Status:** pending
+
+### P22-T04 — Script library: built-in helpers (login flow, form fill, wait for selector)
+
+- **Status:** pending
+
+---
+
+## 23. Phase 23 — CI/CD Integration
+
+### P23-T01 — GitHub Actions action (diwata/assay-action@v1): run assay on PR
+
+- **Status:** pending
+
+### P23-T02 — PR comment: post screenshot + diff summary as a PR comment
+
+- **Status:** pending
+
+### P23-T03 — Status check: fail PR check if regression detected, pass if clean
+
+- **Status:** pending
+
+### P23-T04 — assay ci config: assay.toml [ci] section for check behaviour and thresholds
+
+- **Status:** pending
+
+---
+
+## 24. Phase 24 — Multi-viewport Testing
+
+### P24-T01 — assay run --viewports mobile,tablet,desktop: run same test at multiple widths
+
+- **Status:** pending
+
+### P24-T02 — Viewport results in dashboard: side-by-side view per capture session
+
+- **Status:** pending
+
+### P24-T03 — Viewport regression: diff per viewport independently, separate approve/reject
+
+- **Status:** pending
+
+---
+
+## 25. Phase 25 — Alerts + Webhooks
+
+### P25-T01 — Webhook config: assay.toml [alerts] with URL + events (fail, regression, pass)
+
+- **Status:** pending
+
+### P25-T02 — Webhook delivery: POST JSON payload on triggered events
+
+- **Status:** pending
+
+### P25-T03 — Slack integration: pre-built Slack webhook format with screenshot link
+
+- **Status:** pending
+
+### P25-T04 — Email alerts: SMTP config + HTML email on failure or regression
+
+- **Status:** pending
+
+---
+
+## 26. Phase 26 — Multi-user + Org Accounts
+
+### P26-T01 — User registration + login: email/password accounts, JWT sessions
+
+- **Status:** pending
+
+### P26-T02 — Org model: users belong to an org, data isolated per org
+
+- **Status:** pending
+
+### P26-T03 — Invite flow: invite teammates by email, accept via link
+
+- **Status:** pending
+
+### P26-T04 — Per-key access scoping: restrict API keys to specific projects or users
+
+- **Status:** pending
+
+### P26-T05 — Billing hooks: usage tracking per org (prep for paid tiers)
+
+- **Status:** pending
