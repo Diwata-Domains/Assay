@@ -233,3 +233,27 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 - **Status:** done
 - **Task ID:** TASK-0051
+
+---
+
+## 20. Phase 20 — Hosted Dashboard
+
+### P20-T01 — Admin credentials config (env vars + assay admin set-password)
+
+- **Status:** pending
+
+### P20-T02 — Login page + JWT cookie session (GET /login, POST /login, GET /logout)
+
+- **Status:** pending
+
+### P20-T03 — Auth middleware protecting dashboard routes
+
+- **Status:** pending
+
+### P20-T04 — Key management UI (list, create, revoke from browser)
+
+- **Status:** pending
+
+### P20-T05 — Deployment config (Dockerfile, docker-compose, nginx, .env.example)
+
+- **Status:** pending
