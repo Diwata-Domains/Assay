@@ -77,6 +77,10 @@ def run(
     submit: bool = typer.Option(False, "--submit", help="Submit packet to Grain output path after run."),
     watch: bool = typer.Option(False, "--watch", help="Re-run on file changes (Ctrl+C to exit)."),
     watch_path: str = typer.Option(".", "--watch-path", help="Directory to watch for changes (default: current dir)."),
+    compare: bool = typer.Option(
+        False, "--compare", help="Diff screenshot against stored baseline; exit 1 on regression."
+    ),
+    threshold: float = typer.Option(0.1, "--threshold", help="Regression threshold as % changed pixels (default 0.1)."),
 ) -> None:
     """Execute a test run using the Playwright + Docker runner."""
     from assay.grain.detect import detect_task_id
@@ -106,13 +110,16 @@ def run(
             typer.echo(f"error: {bundle.error}", err=True)
         try:
             packet = format_packet(bundle, task_id=effective_task_id, verification_id=verification_id)
+            packet["url"] = bundle.url or str(target)
             vid = str(packet["verification_id"])
+            candidate_png: Optional[Path] = None
             if bundle.screenshot_path:
                 src = Path(bundle.screenshot_path)
                 if src.exists():
                     dest = Path(output_dir) / f"{vid}.png"
                     shutil.copy2(src, dest)
                     packet["artifact_refs"] = [str(dest)]
+                    candidate_png = dest
             packet_path = write_packet(packet, output_dir)
             typer.echo(f"packet: {packet_path}")
             _store_packet(packet, config)
@@ -121,6 +128,8 @@ def run(
             raise typer.Exit(1) from exc
         if submit:
             _do_submit(str(packet_path), config)
+        if compare and candidate_png is not None:
+            _do_compare(str(target), candidate_png, vid, output_dir, config, threshold)
         return bundle.outcome
 
     if not watch:
@@ -147,6 +156,55 @@ def run(
     except KeyboardInterrupt:
         typer.echo("\nwatch stopped")
         raise typer.Exit(0)
+
+
+def _do_compare(
+    url: str,
+    candidate_png: Path,
+    verification_id: str,
+    output_dir: str,
+    config: AssayConfig,
+    threshold: float,
+) -> None:
+    from assay.diff.engine import DiffError
+    from assay.diff.engine import diff_images as _diff
+    from assay.store.db import get_baseline_for_url as _get_bl
+    from assay.store.db import init_db
+
+    db_path = Path(config.store.db).expanduser()
+    init_db(db_path)
+    baseline = _get_bl(url, db_path)
+    if baseline is None:
+        typer.echo(f"compare: no baseline set for {url}")
+        return
+
+    bl_refs = baseline.get("artifact_refs", [])
+    baseline_png: Optional[Path] = None
+    for ref in (bl_refs if isinstance(bl_refs, list) else []):
+        bp = Path(str(ref))
+        if bp.suffix == ".png" and "_diff" not in bp.stem and bp.exists():
+            baseline_png = bp
+            break
+
+    if baseline_png is None:
+        typer.echo("compare: baseline has no screenshot on disk — skipping diff")
+        return
+
+    diff_path = Path(output_dir) / f"{verification_id}_diff.png"
+    try:
+        result = _diff(baseline_png, candidate_png, diff_path)
+    except DiffError as exc:
+        typer.echo(f"compare: diff failed: {exc}", err=True)
+        return
+
+    typer.echo(
+        f"diff: {result.diff_pct}% changed ({result.changed_pixels}/{result.total_pixels} pixels)"
+    )
+    if result.diff_pct > threshold:
+        typer.echo(f"REGRESSION detected (>{threshold}%)", err=True)
+        raise typer.Exit(1)
+    else:
+        typer.echo(f"clean — within threshold ({threshold}%)")
 
 
 def _store_packet(packet: dict[str, object], config: AssayConfig) -> None:
