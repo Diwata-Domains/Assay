@@ -6,15 +6,60 @@ import base64
 from pathlib import Path
 from typing import Any
 
+import jwt as _jwt
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
 from assay.keys.store import verify_key
 
+_PROTECTED_PREFIXES = ("/", "/packet/", "/keys")
+_PUBLIC_PATHS = {"/login", "/logout", "/ingest", "/docs", "/openapi.json"}
+_PUBLIC_PREFIXES = ("/status/",)
+
+
+class _AuthMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app_: ASGIApp) -> None:
+        super().__init__(app_)
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        from typing import cast as _cast
+
+        path = request.url.path
+
+        if path in _PUBLIC_PATHS or request.method == "POST" and path in ("/login", "/ingest"):
+            return _cast(Response, await call_next(request))
+        if any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+            return _cast(Response, await call_next(request))
+
+        is_protected = path == "/" or any(path.startswith(p) for p in ("/packet/", "/keys"))
+        if not is_protected:
+            return _cast(Response, await call_next(request))
+
+        token = request.cookies.get("assay_session", "")
+        if not token:
+            return RedirectResponse(url="/login", status_code=303)
+
+        from assay.auth.admin import get_jwt_secret
+
+        try:
+            secret = get_jwt_secret()
+            _jwt.decode(token, secret, algorithms=["HS256"])
+        except Exception:
+            response = RedirectResponse(url="/login", status_code=303)
+            response.delete_cookie("assay_session")
+            return response
+
+        return _cast(Response, await call_next(request))
+
+
 app = FastAPI(title="Assay Ingest")
+app.add_middleware(_AuthMiddleware)
 
 # Overridable via app.state for tests
 app.state.key_store = "~/.assay/keys.json"

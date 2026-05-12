@@ -250,11 +250,12 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P20-T03 — Auth middleware protecting dashboard routes
 
-- **Status:** ready
+- **Status:** done
+- **Task ID:** TASK-0054
 
 ### P20-T04 — Key management UI (list, create, revoke from browser)
 
-- **Status:** pending
+- **Status:** ready
 
 ### P20-T05 — Deployment config (Dockerfile, docker-compose, nginx, .env.example)
 
