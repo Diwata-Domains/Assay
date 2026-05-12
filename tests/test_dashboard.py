@@ -5,8 +5,10 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
+from assay.auth.admin import create_token, hash_password
 from assay.ingest.app import app as ingest_app
 from assay.keys.store import create_key
 from assay.store.db import init_db, insert_packet
@@ -24,28 +26,36 @@ _PACKET: dict[str, object] = {
     "raw": "{}",
 }
 
+_SECRET = "x" * 32
+_EMAIL = "admin@test.com"
 
-def _setup_app(tmp_path: Path) -> TestClient:
+
+def _setup_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
+    monkeypatch.setenv("ASSAY_ADMIN_PASSWORD_HASH", hash_password("pw"))
+    monkeypatch.setenv("ASSAY_JWT_SECRET", _SECRET)
     db = tmp_path / "store.db"
     key_file = str(tmp_path / "keys.json")
     ingest_app.state.key_store = key_file
     ingest_app.state.output_dir = str(tmp_path)
     ingest_app.state.store_db = str(db)
-    return TestClient(ingest_app)
+    client = TestClient(ingest_app, follow_redirects=False)
+    client.cookies.set("assay_session", create_token(_EMAIL))
+    return client
 
 
-def test_dashboard_returns_200(tmp_path: Path) -> None:
-    client = _setup_app(tmp_path)
+def test_dashboard_returns_200(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _setup_app(tmp_path, monkeypatch)
     resp = client.get("/")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
 
 
-def test_dashboard_contains_packet_data(tmp_path: Path) -> None:
+def test_dashboard_contains_packet_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db = tmp_path / "store.db"
     init_db(db)
     insert_packet(_PACKET, db)
-    client = _setup_app(tmp_path)
+    client = _setup_app(tmp_path, monkeypatch)
 
     resp = client.get("/")
     assert resp.status_code == 200
@@ -54,20 +64,20 @@ def test_dashboard_contains_packet_data(tmp_path: Path) -> None:
     assert "pass" in resp.text
 
 
-def test_dashboard_empty_store_shows_no_packets(tmp_path: Path) -> None:
-    client = _setup_app(tmp_path)
+def test_dashboard_empty_store_shows_no_packets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _setup_app(tmp_path, monkeypatch)
     resp = client.get("/")
     assert resp.status_code == 200
     assert "no packets" in resp.text
 
 
-def test_dashboard_summary_counts(tmp_path: Path) -> None:
+def test_dashboard_summary_counts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db = tmp_path / "store.db"
     init_db(db)
     insert_packet({**_PACKET, "verification_id": "e001", "outcome": "pass"}, db)
     insert_packet({**_PACKET, "verification_id": "e002", "outcome": "fail"}, db)
     insert_packet({**_PACKET, "verification_id": "e003", "outcome": "fail"}, db)
-    client = _setup_app(tmp_path)
+    client = _setup_app(tmp_path, monkeypatch)
 
     resp = client.get("/")
     assert "3 total" in resp.text
@@ -75,22 +85,22 @@ def test_dashboard_summary_counts(tmp_path: Path) -> None:
     assert "2 fail" in resp.text
 
 
-def test_dashboard_screenshot_yes(tmp_path: Path) -> None:
+def test_dashboard_screenshot_yes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db = tmp_path / "store.db"
     init_db(db)
     png = str(tmp_path / "dddd-0004.png")
     insert_packet({**_PACKET, "artifact_refs": [png]}, db)
-    client = _setup_app(tmp_path)
+    client = _setup_app(tmp_path, monkeypatch)
 
     resp = client.get("/")
     assert "yes" in resp.text
 
 
-def test_dashboard_screenshot_no(tmp_path: Path) -> None:
+def test_dashboard_screenshot_no(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db = tmp_path / "store.db"
     init_db(db)
     insert_packet({**_PACKET, "artifact_refs": []}, db)
-    client = _setup_app(tmp_path)
+    client = _setup_app(tmp_path, monkeypatch)
 
     resp = client.get("/")
     assert "no" in resp.text
