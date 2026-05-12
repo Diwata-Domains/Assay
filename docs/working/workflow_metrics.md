@@ -407,3 +407,22 @@
 - **Lint/typecheck at phase close:** clean
 
 ---
+
+### Phase 20
+
+#### Tasks
+
+| Task | Status | Notes |
+|------|--------|-------|
+| P20-T01 Admin credentials config | done | TASK-0052; ASSAY_ADMIN_* env vars; bcrypt+JWT auth module; assay admin set-password CLI; 11 tests |
+| P20-T02 Login page + JWT cookie session | done | TASK-0053; GET/POST /login + GET /logout; HTTP-only cookie; dark theme; 7 tests |
+| P20-T03 Auth middleware | done | TASK-0054; protects /, /packet/*, /keys; public /login /ingest /status/*; 8 tests |
+| P20-T04 Key management UI | done | TASK-0055; GET/POST /keys + revoke; raw key shown once; 7 tests |
+| P20-T05 Deployment config | done | TASK-0056; Dockerfile + docker-compose + nginx + .env.example + deploy guide |
+
+#### Phase Health
+- **Tasks completed:** 5
+- **Tests at phase close:** 377 pytest — all passing
+- **Lint/typecheck at phase close:** clean
+
+---
