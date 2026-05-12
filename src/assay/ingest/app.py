@@ -324,6 +324,117 @@ nav a{{margin-right:1.5rem}}
     return HTMLResponse(content=html)
 
 
+_SLIDER_CSS = """
+.diff-tabs{display:flex;gap:.5rem;margin-bottom:.75rem}
+.diff-tab{background:#1a1a1a;border:1px solid #333;color:#aaa;padding:.3rem .85rem;
+border-radius:4px;font-family:monospace;font-size:.8rem;cursor:pointer}
+.diff-tab.active{background:#2a2a2a;border-color:#555;color:#e0e0e0}
+.diff-tab:hover{background:#222}
+.diff-stats{font-size:.85rem;color:#aaa;margin:.4rem 0 .75rem}
+.slider-wrap{position:relative;overflow:hidden;max-width:900px;
+cursor:col-resize;user-select:none;border:1px solid #333;line-height:0}
+.slider-wrap img.sl-base{display:block;width:100%}
+.sl-after{position:absolute;top:0;left:0;bottom:0;overflow:hidden;width:50%}
+.sl-after img{display:block;width:100%}
+.sl-handle{position:absolute;top:0;left:50%;height:100%;width:3px;
+background:rgba(255,255,255,.85);transform:translateX(-50%);
+pointer-events:none;display:flex;align-items:center;justify-content:center}
+.sl-knob{width:28px;height:28px;border-radius:50%;background:#fff;
+display:flex;align-items:center;justify-content:center;
+color:#333;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.6);pointer-events:none}
+.sbs-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:900px}
+.sbs-grid p{margin:.25rem 0 .4rem;font-size:.8rem;color:#888}
+.sbs-grid img{width:100%;border:1px solid #333}
+"""
+
+_SLIDER_JS = """
+(function(){
+  var c=document.getElementById('sl-c');
+  if(!c)return;
+  var after=document.getElementById('sl-after');
+  var handle=document.getElementById('sl-handle');
+  var afterImg=after.querySelector('img');
+  var drag=false;
+  function pct(e){
+    var r=c.getBoundingClientRect();
+    var x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    return Math.max(0,Math.min(100,x/r.width*100));
+  }
+  function set(p){
+    after.style.width=p+'%';
+    handle.style.left=p+'%';
+    afterImg.style.width=c.offsetWidth+'px';
+  }
+  c.addEventListener('mousedown',function(e){drag=true;set(pct(e));e.preventDefault();});
+  window.addEventListener('mouseup',function(){drag=false;});
+  window.addEventListener('mousemove',function(e){if(drag)set(pct(e));});
+  c.addEventListener('touchstart',function(e){drag=true;set(pct(e.touches[0]));},{passive:true});
+  window.addEventListener('touchend',function(){drag=false;});
+  window.addEventListener('touchmove',function(e){if(drag){set(pct(e));e.preventDefault();}},{passive:false});
+  function init(){set(50);afterImg.style.width=c.offsetWidth+'px';}
+  if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',init);else init();
+  window.addEventListener('resize',function(){if(!drag)set(50);});
+})();
+function showDiffTab(id){
+  document.querySelectorAll('.diff-tab').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('.diff-panel').forEach(function(p){p.style.display='none';});
+  document.getElementById(id).style.display='';
+  event.target.classList.add('active');
+}
+"""
+
+
+def _build_slider_html(
+    baseline_b64: str,
+    candidate_b64: str,
+    diff_b64: str,
+    stats_p: str,
+) -> str:
+    diff_tab_btn = (
+        "<button class='diff-tab' onclick=\"showDiffTab('dp-diff')\">Highlight</button>"
+        if diff_b64
+        else ""
+    )
+    diff_tab_panel = (
+        f"<div id='dp-diff' class='diff-panel' style='display:none'>"
+        f"<img src='data:image/png;base64,{diff_b64}' "
+        f"style='max-width:900px;width:100%;border:1px solid #333'>"
+        f"</div>"
+        if diff_b64
+        else ""
+    )
+    return (
+        f"<style>{_SLIDER_CSS}</style>"
+        "<h2>Diff vs Baseline</h2>"
+        f"{stats_p}"
+        "<div class='diff-tabs'>"
+        "<button class='diff-tab active' onclick=\"showDiffTab('dp-slider')\">Slider</button>"
+        f"{diff_tab_btn}"
+        "<button class='diff-tab' onclick=\"showDiffTab('dp-sbs')\">Side by side</button>"
+        "</div>"
+        "<div id='dp-slider' class='diff-panel'>"
+        "<div class='slider-wrap' id='sl-c'>"
+        f"<img class='sl-base' src='data:image/png;base64,{baseline_b64}' alt='baseline'>"
+        "<div class='sl-after' id='sl-after'>"
+        f"<img src='data:image/png;base64,{candidate_b64}' alt='candidate'>"
+        "</div>"
+        "<div class='sl-handle' id='sl-handle'><div class='sl-knob'>⟺</div></div>"
+        "</div>"
+        "<p style='font-size:.75rem;color:#666;margin-top:.4rem'>"
+        "← drag to compare baseline (left) vs new capture (right)</p>"
+        "</div>"
+        f"{diff_tab_panel}"
+        "<div id='dp-sbs' class='diff-panel' style='display:none'>"
+        "<div class='sbs-grid'>"
+        f"<div><p>Before (baseline)</p>"
+        f"<img src='data:image/png;base64,{baseline_b64}' alt='baseline'></div>"
+        f"<div><p>After (new capture)</p>"
+        f"<img src='data:image/png;base64,{candidate_b64}' alt='candidate'></div>"
+        "</div></div>"
+        f"<script>{_SLIDER_JS}</script>"
+    )
+
+
 @app.get("/packet/{verification_id}", response_class=HTMLResponse)
 async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
     import base64 as _b64
@@ -353,39 +464,68 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
             continue
         fields_html += f"<dt>{key}</dt><dd>{val}</dd>"
 
-    screenshot_html = ""
     refs = packet.get("artifact_refs", [])
     ref_list = refs if isinstance(refs, list) else []
+    candidate_b64 = ""
     for ref in ref_list:
         p_path = Path(str(ref))
         if p_path.suffix == ".png" and "_diff" not in p_path.stem and p_path.exists():
-            img_b64 = _b64.b64encode(p_path.read_bytes()).decode()
-            screenshot_html = (
-                f'<h2>Screenshot</h2>'
-                f'<img src="data:image/png;base64,{img_b64}" '
-                f'style="max-width:100%;border:1px solid #333">'
-            )
+            candidate_b64 = _b64.b64encode(p_path.read_bytes()).decode()
             break
 
+    screenshot_html = ""
     diff_html = ""
     diff_result = packet.get("diff_result")
+
     if isinstance(diff_result, dict):
         diff_pct = diff_result.get("diff_pct", 0)
         changed = diff_result.get("changed_pixels", 0)
         total = diff_result.get("total_pixels", 0)
         diff_img_path = Path(str(diff_result.get("diff_image_path", "")))
-        diff_img_html = ""
+        diff_b64 = ""
         if diff_img_path.exists():
             diff_b64 = _b64.b64encode(diff_img_path.read_bytes()).decode()
-            diff_img_html = (
+
+        baseline_b64 = ""
+        packet_url = str(packet.get("url", ""))
+        if packet_url:
+            from assay.store.db import get_baseline_for_url as _get_bl
+
+            bl_packet = _get_bl(packet_url, db_path)
+            if bl_packet:
+                bl_refs = bl_packet.get("artifact_refs", [])
+                for br in (bl_refs if isinstance(bl_refs, list) else []):
+                    bp = Path(str(br))
+                    if bp.suffix == ".png" and "_diff" not in bp.stem and bp.exists():
+                        baseline_b64 = _b64.b64encode(bp.read_bytes()).decode()
+                        break
+
+        stats_p = (
+            f'<p class="diff-stats">{diff_pct}% changed '
+            f"({changed} / {total} pixels)</p>"
+        )
+
+        if baseline_b64 and candidate_b64:
+            diff_html = _build_slider_html(
+                baseline_b64, candidate_b64, diff_b64, stats_p
+            )
+        else:
+            diff_img_tag = (
                 f'<img src="data:image/png;base64,{diff_b64}" '
                 f'style="max-width:100%;border:1px solid #333;margin-top:.5rem">'
+                if diff_b64
+                else ""
             )
-        diff_html = (
-            "<h2>Diff vs Baseline</h2>"
-            f'<p style="font-size:.9rem">{diff_pct}% changed '
-            f'({changed} / {total} pixels)</p>'
-            f"{diff_img_html}"
+            diff_html = (
+                "<h2>Diff vs Baseline</h2>"
+                f"{stats_p}"
+                f"{diff_img_tag}"
+            )
+    elif candidate_b64:
+        screenshot_html = (
+            "<h2>Screenshot</h2>"
+            f'<img src="data:image/png;base64,{candidate_b64}" '
+            'style="max-width:100%;border:1px solid #333">'
         )
 
     raw_str = str(packet.get("raw", ""))

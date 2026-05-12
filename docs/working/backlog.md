@@ -274,12 +274,13 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P21-T02 — Pixel diff engine: compare new capture against baseline, generate diff image
 
-- **Status:** in_progress
+- **Status:** done
 - **Task ID:** TASK-0058
 
 ### P21-T03 — Diff view in dashboard: before/after slider + highlighted regions
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0059
 
 ### P21-T04 — Approve/reject workflow: accept new baseline or flag as regression
 
