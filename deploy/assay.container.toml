@@ -1,0 +1,11 @@
+[keys]
+store = "/data/keys.json"
+
+[store]
+db = "/data/store.db"
+
+[output]
+directory = "/data/assay-output"
+
+[schedule]
+store = "/data/schedules.json"
