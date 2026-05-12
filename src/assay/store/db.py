@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS packets (
 )
 """
 
+_CREATE_BASELINES = """
+CREATE TABLE IF NOT EXISTS baselines (
+    url              TEXT PRIMARY KEY,
+    verification_id  TEXT NOT NULL
+)
+"""
+
 
 class StoreError(Exception):
     """Raised on unrecoverable store failures."""
@@ -42,6 +49,7 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
     path = db_path or _DEFAULT_DB
     with _connect(path) as conn:
         conn.execute(_CREATE_PACKETS)
+        conn.execute(_CREATE_BASELINES)
     return path
 
 
@@ -118,3 +126,56 @@ def import_packets(packets: list[dict[str, object]], db_path: Optional[Path] = N
         except StoreError:
             continue
     return count
+
+
+def set_baseline(verification_id: str, db_path: Optional[Path] = None) -> str:  # noqa: UP007
+    """Mark a packet as the baseline for its URL. Returns the URL. Raises StoreError if packet not found."""
+    path = db_path or _DEFAULT_DB
+    packets = list_packets(path)
+    packet = next((p for p in packets if str(p.get("verification_id", "")) == verification_id), None)
+    if packet is None:
+        raise StoreError(f"packet {verification_id} not found")
+    url = str(packet.get("url", "")).strip()
+    if not url:
+        raise StoreError(f"packet {verification_id} has no url field")
+    try:
+        with _connect(path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO baselines (url, verification_id) VALUES (?, ?)",
+                (url, verification_id),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"set_baseline failed: {exc}") from exc
+    return url
+
+
+def get_baseline_for_url(url: str, db_path: Optional[Path] = None) -> Optional[dict[str, object]]:  # noqa: UP007
+    """Return the baseline packet for a URL, or None if no baseline is set."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return None
+    try:
+        with _connect(path) as conn:
+            row = conn.execute(
+                "SELECT verification_id FROM baselines WHERE url = ?", (url,)
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StoreError(f"get_baseline_for_url failed: {exc}") from exc
+    if row is None:
+        return None
+    vid = row["verification_id"]
+    packets = list_packets(path)
+    return next((p for p in packets if str(p.get("verification_id", "")) == vid), None)
+
+
+def list_baselines(db_path: Optional[Path] = None) -> dict[str, str]:  # noqa: UP007
+    """Return a mapping of {url: verification_id} for all set baselines."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return {}
+    try:
+        with _connect(path) as conn:
+            rows = conn.execute("SELECT url, verification_id FROM baselines").fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_baselines failed: {exc}") from exc
+    return {row["url"]: row["verification_id"] for row in rows}
