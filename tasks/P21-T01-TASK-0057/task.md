@@ -2,7 +2,7 @@
 
 ## Metadata
 - **ID:** TASK-0057
-- **Status:** in_progress
+- **Status:** done
 - **Phase:** P21-T01
 - **Backlog:** P21-T01 — Baseline capture: mark a packet as the approved baseline for a URL
 - **Packet Path:** tasks/P21-T01-TASK-0057/

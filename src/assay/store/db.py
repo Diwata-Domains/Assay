@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS packets (
     artifact_refs   TEXT NOT NULL DEFAULT '[]',
     followup_candidates TEXT NOT NULL DEFAULT '[]',
     verified_at     TEXT,
+    diff_result     TEXT,
     raw             TEXT NOT NULL
 )
 """
@@ -50,6 +51,10 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
     with _connect(path) as conn:
         conn.execute(_CREATE_PACKETS)
         conn.execute(_CREATE_BASELINES)
+        try:
+            conn.execute("ALTER TABLE packets ADD COLUMN diff_result TEXT")
+        except sqlite3.OperationalError:
+            pass
     return path
 
 
@@ -59,14 +64,16 @@ def insert_packet(packet: dict[str, object], db_path: Optional[Path] = None) -> 
     vid = str(packet.get("verification_id", ""))
     if not vid:
         raise StoreError("packet missing verification_id")
+    diff_raw = packet.get("diff_result")
+    diff_json: Optional[str] = json.dumps(diff_raw) if diff_raw is not None else None
     try:
         with _connect(path) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO packets
                     (verification_id, task_id, issue_type, severity, outcome,
-                     summary, artifact_refs, followup_candidates, verified_at, raw)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     summary, artifact_refs, followup_candidates, verified_at, diff_result, raw)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     vid,
@@ -78,6 +85,7 @@ def insert_packet(packet: dict[str, object], db_path: Optional[Path] = None) -> 
                     json.dumps(packet.get("artifact_refs", [])),
                     json.dumps(packet.get("followup_candidates", [])),
                     packet.get("verified_at"),
+                    diff_json,
                     json.dumps(packet),
                 ),
             )
