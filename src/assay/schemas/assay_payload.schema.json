@@ -58,6 +58,20 @@
       "type": ["string", "null"],
       "format": "date-time",
       "description": "ISO 8601 datetime when Assay completed the verification run."
+    },
+    "url": {
+      "type": ["string", "null"],
+      "description": "URL of the page captured (populated by SDK ingest path)."
+    },
+    "diff_result": {
+      "type": ["object", "null"],
+      "description": "Pixel diff result against the baseline for this URL.",
+      "properties": {
+        "changed_pixels": { "type": "integer" },
+        "total_pixels": { "type": "integer" },
+        "diff_pct": { "type": "number" },
+        "diff_image_path": { "type": "string" }
+      }
     }
   }
 }

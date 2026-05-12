@@ -147,12 +147,14 @@ async def ingest(
 ) -> dict[str, str]:
     meta_vid = str(payload.metadata.get("verification_id", "")) or None
     packet = format_sdk_packet(payload, verification_id=meta_vid)
+    packet["url"] = payload.url
     if payload.task_id:
         packet["task_id"] = payload.task_id
     output_dir = request.app.state.output_dir
     verification_id = str(packet["verification_id"])
     screenshot_path = _save_screenshot(verification_id, payload.screenshot, output_dir)
     packet["artifact_refs"] = [screenshot_path]
+    _attach_diff(packet, payload.url, screenshot_path, output_dir, request.app.state.store_db)
     write_packet(packet, output_dir)
     _store_ingest_packet(packet, request.app.state.store_db)
     return {"status": "accepted"}
@@ -345,7 +347,7 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
         return HTMLResponse(content=html_404, status_code=404)
 
     fields_html = ""
-    skip = {"artifact_refs", "raw"}
+    skip = {"artifact_refs", "raw", "diff_result"}
     for key, val in packet.items():
         if key in skip:
             continue
@@ -356,7 +358,7 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
     ref_list = refs if isinstance(refs, list) else []
     for ref in ref_list:
         p_path = Path(str(ref))
-        if p_path.suffix == ".png" and p_path.exists():
+        if p_path.suffix == ".png" and "_diff" not in p_path.stem and p_path.exists():
             img_b64 = _b64.b64encode(p_path.read_bytes()).decode()
             screenshot_html = (
                 f'<h2>Screenshot</h2>'
@@ -364,6 +366,27 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
                 f'style="max-width:100%;border:1px solid #333">'
             )
             break
+
+    diff_html = ""
+    diff_result = packet.get("diff_result")
+    if isinstance(diff_result, dict):
+        diff_pct = diff_result.get("diff_pct", 0)
+        changed = diff_result.get("changed_pixels", 0)
+        total = diff_result.get("total_pixels", 0)
+        diff_img_path = Path(str(diff_result.get("diff_image_path", "")))
+        diff_img_html = ""
+        if diff_img_path.exists():
+            diff_b64 = _b64.b64encode(diff_img_path.read_bytes()).decode()
+            diff_img_html = (
+                f'<img src="data:image/png;base64,{diff_b64}" '
+                f'style="max-width:100%;border:1px solid #333;margin-top:.5rem">'
+            )
+        diff_html = (
+            "<h2>Diff vs Baseline</h2>"
+            f'<p style="font-size:.9rem">{diff_pct}% changed '
+            f'({changed} / {total} pixels)</p>'
+            f"{diff_img_html}"
+        )
 
     raw_str = str(packet.get("raw", ""))
     try:
@@ -410,6 +433,7 @@ a:hover{{text-decoration:underline}}
 <p>{baseline_action}</p>
 <dl>{fields_html}</dl>
 {screenshot_html}
+{diff_html}
 <h2>Raw</h2>
 <pre>{raw_pretty}</pre>
 </body>
@@ -558,6 +582,48 @@ async def keys_revoke(key_id: str, request: Request) -> RedirectResponse:
     except KeyStoreError:
         pass
     return RedirectResponse(url="/keys", status_code=303)
+
+
+def _attach_diff(
+    packet: dict[str, object],
+    url: str,
+    screenshot_path: str,
+    output_dir: str,
+    store_db: str,
+) -> None:
+    """Run pixel diff against baseline if one exists for the URL. Mutates packet in-place."""
+    from pathlib import Path as _Path
+
+    from assay.diff.engine import DiffError
+    from assay.diff.engine import diff_images as _diff
+    from assay.store.db import get_baseline_for_url as _get_baseline
+    from assay.store.db import init_db as _init
+
+    try:
+        db_path = _Path(store_db).expanduser()
+        _init(db_path)
+        baseline = _get_baseline(url, db_path)
+        if baseline is None:
+            return
+        refs = baseline.get("artifact_refs", [])
+        ref_list = refs if isinstance(refs, list) else []
+        baseline_png = next((r for r in ref_list if str(r).endswith(".png")), None)
+        if not baseline_png:
+            return
+        diff_path = _Path(output_dir) / f"{packet['verification_id']}_diff.png"
+        result = _diff(_Path(str(baseline_png)), _Path(screenshot_path), diff_path)
+        packet["diff_result"] = {
+            "changed_pixels": result.changed_pixels,
+            "total_pixels": result.total_pixels,
+            "diff_pct": result.diff_pct,
+            "diff_image_path": result.diff_image_path,
+        }
+        from typing import cast as _cast2
+
+        existing = _cast2(list[object], packet.get("artifact_refs", []))
+        packet["artifact_refs"] = list(existing) + [result.diff_image_path]
+    except (DiffError, Exception):
+        pass
 
 
 def _store_ingest_packet(packet: dict[str, object], store_db: str) -> None:
