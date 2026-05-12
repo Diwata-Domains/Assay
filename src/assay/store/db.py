@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS packets (
     followup_candidates TEXT NOT NULL DEFAULT '[]',
     verified_at     TEXT,
     diff_result     TEXT,
+    review_status   TEXT,
     raw             TEXT NOT NULL
 )
 """
@@ -55,6 +56,10 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
             conn.execute("ALTER TABLE packets ADD COLUMN diff_result TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE packets ADD COLUMN review_status TEXT")
+        except sqlite3.OperationalError:
+            pass
     return path
 
 
@@ -66,14 +71,17 @@ def insert_packet(packet: dict[str, object], db_path: Optional[Path] = None) -> 
         raise StoreError("packet missing verification_id")
     diff_raw = packet.get("diff_result")
     diff_json: Optional[str] = json.dumps(diff_raw) if diff_raw is not None else None
+    review = packet.get("review_status")
+    review_str: Optional[str] = str(review) if review is not None else None
     try:
         with _connect(path) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO packets
                     (verification_id, task_id, issue_type, severity, outcome,
-                     summary, artifact_refs, followup_candidates, verified_at, diff_result, raw)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     summary, artifact_refs, followup_candidates, verified_at,
+                     diff_result, review_status, raw)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     vid,
@@ -86,6 +94,7 @@ def insert_packet(packet: dict[str, object], db_path: Optional[Path] = None) -> 
                     json.dumps(packet.get("followup_candidates", [])),
                     packet.get("verified_at"),
                     diff_json,
+                    review_str,
                     json.dumps(packet),
                 ),
             )
@@ -187,3 +196,27 @@ def list_baselines(db_path: Optional[Path] = None) -> dict[str, str]:  # noqa: U
     except sqlite3.Error as exc:
         raise StoreError(f"list_baselines failed: {exc}") from exc
     return {row["url"]: row["verification_id"] for row in rows}
+
+
+def set_review_status(
+    verification_id: str,
+    status: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Set review_status on a packet and update its raw JSON. Raises StoreError if not found."""
+    if status not in ("approved", "rejected"):
+        raise StoreError(f"invalid review_status: {status!r}")
+    path = db_path or _DEFAULT_DB
+    packets = list_packets(path)
+    packet = next((p for p in packets if str(p.get("verification_id", "")) == verification_id), None)
+    if packet is None:
+        raise StoreError(f"packet {verification_id} not found")
+    packet["review_status"] = status
+    try:
+        with _connect(path) as conn:
+            conn.execute(
+                "UPDATE packets SET review_status=?, raw=? WHERE verification_id=?",
+                (status, json.dumps(packet), verification_id),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"set_review_status failed: {exc}") from exc
