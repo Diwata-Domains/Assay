@@ -260,7 +260,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P20-T05 — Deployment config (Dockerfile, docker-compose, nginx, .env.example)
 
-- **Status:** ready
+- **Status:** done
+- **Task ID:** TASK-0056
 
 ---
 
