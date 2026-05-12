@@ -269,7 +269,7 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P21-T01 — Baseline capture: mark a packet as the approved baseline for a URL
 
-- **Status:** pending
+- **Status:** ready
 
 ### P21-T02 — Pixel diff engine: compare new capture against baseline, generate diff image
 

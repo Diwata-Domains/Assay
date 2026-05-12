@@ -231,10 +231,13 @@ async def logout() -> RedirectResponse:
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
+    from assay.store.db import list_baselines as _baselines
     from assay.store.db import list_packets as _list
 
     db_path = Path(request.app.state.store_db).expanduser()
     packets = _list(db_path)
+    baselines = _baselines(db_path)
+    baseline_vids = set(baselines.values())
 
     total = len(packets)
     counts: dict[str, int] = {}
@@ -249,7 +252,7 @@ async def dashboard(request: Request) -> HTMLResponse:
 
     rows = ""
     if not packets:
-        rows = '<tr><td colspan="7" style="text-align:center">no packets</td></tr>'
+        rows = '<tr><td colspan="8" style="text-align:center">no packets</td></tr>'
     else:
         for p in packets:
             vid = str(p.get("verification_id", ""))
@@ -261,9 +264,10 @@ async def dashboard(request: Request) -> HTMLResponse:
             refs = p.get("artifact_refs", [])
             ref_list = refs if isinstance(refs, list) else []
             has_screenshot = "yes" if any(str(r).endswith(".png") for r in ref_list) else "no"
+            baseline_badge = ' <span class="baseline-badge">baseline</span>' if vid in baseline_vids else ""
             rows += (
                 f"<tr>"
-                f'<td><a href="/packet/{vid}">{vid[:8]}…</a></td>'
+                f'<td><a href="/packet/{vid}">{vid[:8]}…</a>{baseline_badge}</td>'
                 f'<td class="outcome-{outcome}">{outcome}</td>'
                 f"<td>{severity}</td>"
                 f"<td>{has_screenshot}</td>"
@@ -286,12 +290,16 @@ h1{{color:#fff;border-bottom:1px solid #333;padding-bottom:.5rem}}
 .outcome-pass{{color:#4caf50}}
 .outcome-fail{{color:#f44336}}
 .outcome-inconclusive{{color:#ff9800}}
+.baseline-badge{{background:#1a2a1a;color:#81c784;border:1px solid #2e7d32;
+border-radius:3px;padding:.1rem .4rem;font-size:.75rem;margin-left:.4rem}}
 table{{border-collapse:collapse;width:100%;margin-top:1rem}}
 th{{text-align:left;padding:.4rem .75rem;background:#1a1a1a;border-bottom:2px solid #333;font-size:.85rem}}
 td{{padding:.35rem .75rem;border-bottom:1px solid #1e1e1e;font-size:.85rem}}
 tr:hover td{{background:#141414}}
 a{{color:#90caf9;text-decoration:none}}
 a:hover{{text-decoration:underline}}
+nav{{margin-top:2rem;font-size:.85rem}}
+nav a{{margin-right:1.5rem}}
 </style>
 </head>
 <body>
@@ -308,6 +316,7 @@ a:hover{{text-decoration:underline}}
 {rows}
 </tbody>
 </table>
+<nav><a href="/keys">API Keys</a><a href="/logout">Sign out</a></nav>
 </body>
 </html>"""
     return HTMLResponse(content=html)
@@ -362,6 +371,23 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
     except Exception:
         raw_pretty = raw_str
 
+    from assay.store.db import list_baselines as _baselines
+
+    db_path_for_baseline = Path(request.app.state.store_db).expanduser()
+    baselines = _baselines(db_path_for_baseline)
+    baseline_vids = set(baselines.values())
+    is_baseline = verification_id in baseline_vids
+    baseline_action = (
+        '<span style="color:#81c784;font-size:.85rem">✓ This is the current baseline for this URL</span>'
+        if is_baseline
+        else (
+            f"<form method='post' action='/packet/{verification_id}/set-baseline' style='display:inline'>"
+            "<button style='background:#1a2a1a;border:1px solid #2e7d32;color:#81c784;"
+            "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
+            "cursor:pointer'>Set as baseline</button></form>"
+        )
+    )
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -381,6 +407,7 @@ a:hover{{text-decoration:underline}}
 <body>
 <p><a href="/">← dashboard</a></p>
 <h1>Packet {verification_id[:8]}…</h1>
+<p>{baseline_action}</p>
 <dl>{fields_html}</dl>
 {screenshot_html}
 <h2>Raw</h2>
@@ -388,6 +415,19 @@ a:hover{{text-decoration:underline}}
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
+
+@app.post("/packet/{verification_id}/set-baseline")
+async def set_packet_baseline(verification_id: str, request: Request) -> RedirectResponse:
+    from assay.store.db import StoreError
+    from assay.store.db import set_baseline as _set
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    try:
+        _set(verification_id, db_path)
+    except StoreError:
+        pass
+    return RedirectResponse(url=f"/packet/{verification_id}", status_code=303)
 
 
 @app.get("/status/{verification_id}")

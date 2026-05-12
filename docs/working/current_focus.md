@@ -1,24 +1,25 @@
 # Current Focus
 
 ## Current Phase
-Phase 20 — Hosted Dashboard
+Phase 21 — Visual Regression Testing
 
 ---
 
 ## Active Focus
 
-Phase 19 complete: html-to-image SDK upgrade, Docker runner smoke-tested, SDK taskId/verificationId passthrough added.
+Phase 20 complete: hosted dashboard with single-admin login, key management UI, deployment config.
 
-Assay is now ready for CRM integration:
-- Browser SDK captures high-quality screenshots via html-to-image
-- Docker Playwright runner tested end-to-end
-- Full Grain verify handshake supported (VERIFY-XXXX-NNN passthrough)
+Phase 21: visual regression — baseline capture, pixel diff, approve/reject workflow.
 
 ---
 
 ## Immediate Priorities
 
-Awaiting operator direction for Phase 20.
+1. P21-T01: Baseline capture — mark a packet as the approved baseline for a URL
+2. P21-T02: Pixel diff engine
+3. P21-T03: Diff view in dashboard
+4. P21-T04: Approve/reject workflow
+5. P21-T05: assay run --compare
 
 ---
 
