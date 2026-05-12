@@ -540,16 +540,45 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
     baselines = _baselines(db_path_for_baseline)
     baseline_vids = set(baselines.values())
     is_baseline = verification_id in baseline_vids
-    baseline_action = (
-        '<span style="color:#81c784;font-size:.85rem">✓ This is the current baseline for this URL</span>'
-        if is_baseline
-        else (
+    review_status = str(packet.get("review_status") or "")
+
+    if is_baseline:
+        baseline_action = (
+            '<span style="color:#81c784;font-size:.85rem">✓ This is the current baseline for this URL</span>'
+        )
+    else:
+        baseline_action = (
             f"<form method='post' action='/packet/{verification_id}/set-baseline' style='display:inline'>"
             "<button style='background:#1a2a1a;border:1px solid #2e7d32;color:#81c784;"
             "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
             "cursor:pointer'>Set as baseline</button></form>"
         )
-    )
+
+    has_diff = isinstance(diff_result, dict)
+    review_buttons = ""
+    if has_diff and not is_baseline:
+        review_buttons = (
+            f"<form method='post' action='/packet/{verification_id}/approve' style='display:inline;margin-left:.75rem'>"
+            "<button style='background:#0a1a0a;border:1px solid #2e7d32;color:#81c784;"
+            "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
+            "cursor:pointer'>✓ Approve</button></form>"
+            f"<form method='post' action='/packet/{verification_id}/reject' style='display:inline;margin-left:.5rem'>"
+            "<button style='background:#1a0a0a;border:1px solid #c62828;color:#ef9a9a;"
+            "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
+            "cursor:pointer'>✗ Reject</button></form>"
+        )
+
+    review_badge = ""
+    if review_status == "approved":
+        review_badge = (
+            " <span style='background:#0a1a0a;color:#81c784;border:1px solid #2e7d32;"
+            "border-radius:3px;padding:.1rem .4rem;font-size:.75rem'>approved</span>"
+        )
+    elif review_status == "rejected":
+        review_badge = (
+            " <span style='background:#1a0a0a;color:#ef9a9a;border:1px solid #c62828;"
+            "border-radius:3px;padding:.1rem .4rem;font-size:.75rem'>regression</span>"
+        )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -569,8 +598,8 @@ a:hover{{text-decoration:underline}}
 </head>
 <body>
 <p><a href="/">← dashboard</a></p>
-<h1>Packet {verification_id[:8]}…</h1>
-<p>{baseline_action}</p>
+<h1>Packet {verification_id[:8]}…{review_badge}</h1>
+<p>{baseline_action}{review_buttons}</p>
 <dl>{fields_html}</dl>
 {screenshot_html}
 {diff_html}
@@ -589,6 +618,37 @@ async def set_packet_baseline(verification_id: str, request: Request) -> Redirec
     db_path = Path(request.app.state.store_db).expanduser()
     try:
         _set(verification_id, db_path)
+    except StoreError:
+        pass
+    return RedirectResponse(url=f"/packet/{verification_id}", status_code=303)
+
+
+@app.post("/packet/{verification_id}/approve")
+async def approve_packet(verification_id: str, request: Request) -> RedirectResponse:
+    from assay.store.db import StoreError
+    from assay.store.db import set_baseline as _set
+    from assay.store.db import set_review_status as _review
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    try:
+        _set(verification_id, db_path)
+    except StoreError:
+        pass
+    try:
+        _review(verification_id, "approved", db_path)
+    except StoreError:
+        pass
+    return RedirectResponse(url=f"/packet/{verification_id}", status_code=303)
+
+
+@app.post("/packet/{verification_id}/reject")
+async def reject_packet(verification_id: str, request: Request) -> RedirectResponse:
+    from assay.store.db import StoreError
+    from assay.store.db import set_review_status as _review
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    try:
+        _review(verification_id, "rejected", db_path)
     except StoreError:
         pass
     return RedirectResponse(url=f"/packet/{verification_id}", status_code=303)
