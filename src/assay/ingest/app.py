@@ -6,8 +6,8 @@ import base64
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
 
 from assay.formatter.formatter import format_sdk_packet
@@ -111,6 +111,77 @@ async def ingest(
     write_packet(packet, output_dir)
     _store_ingest_packet(packet, request.app.state.store_db)
     return {"status": "accepted"}
+
+
+_LOGIN_STYLE = (
+    "body{font-family:monospace;background:#0d0d0d;color:#e0e0e0;"
+    "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
+    ".box{background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:2rem 2.5rem;width:320px}"
+    "h1{color:#fff;margin:0 0 1.5rem;font-size:1.2rem;border-bottom:1px solid #333;padding-bottom:.75rem}"
+    "label{display:block;font-size:.8rem;color:#999;margin-bottom:.25rem}"
+    "input{width:100%;box-sizing:border-box;background:#0d0d0d;border:1px solid #333;color:#e0e0e0;"
+    "padding:.5rem .6rem;border-radius:4px;font-family:monospace;font-size:.9rem;margin-bottom:1rem}"
+    "input:focus{outline:none;border-color:#555}"
+    "button{width:100%;background:#2a2a2a;border:1px solid #444;color:#e0e0e0;padding:.6rem;"
+    "border-radius:4px;font-family:monospace;font-size:.9rem;cursor:pointer}"
+    "button:hover{background:#333}"
+    ".error{color:#f44336;font-size:.8rem;margin-bottom:1rem}"
+)
+
+
+def _login_page(error: str = "") -> str:
+    error_html = f'<p class="error">{error}</p>' if error else ""
+    return (
+        "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
+        "<title>Assay — Login</title>"
+        f"<style>{_LOGIN_STYLE}</style></head><body>"
+        "<div class='box'><h1>Assay</h1>"
+        f"{error_html}"
+        "<form method='post' action='/login'>"
+        "<label>Email</label><input type='email' name='email' required autofocus>"
+        "<label>Password</label><input type='password' name='password' required>"
+        "<button type='submit'>Sign in</button>"
+        "</form></div></body></html>"
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page() -> HTMLResponse:
+    return HTMLResponse(_login_page())
+
+
+@app.post("/login", response_model=None)
+async def login_submit(
+    email: str = Form(...),
+    password: str = Form(...),
+) -> HTMLResponse | RedirectResponse:
+    from assay.auth.admin import (
+        create_token,
+        get_admin_email,
+        get_admin_password_hash,
+        verify_password,
+    )
+
+    try:
+        admin_email = get_admin_email()
+        admin_hash = get_admin_password_hash()
+    except RuntimeError:
+        return HTMLResponse(_login_page("Server misconfigured — ASSAY_ADMIN_* env vars not set."), status_code=500)
+
+    if email.strip().lower() != admin_email.lower() or not verify_password(password, admin_hash):
+        return HTMLResponse(_login_page("Invalid email or password."), status_code=401)
+
+    token = create_token(email.strip().lower())
+    response: RedirectResponse = RedirectResponse(url="/", status_code=303)
+    response.set_cookie("assay_session", token, httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/logout")
+async def logout() -> RedirectResponse:
+    response: RedirectResponse = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("assay_session")
+    return response
 
 
 @app.get("/", response_class=HTMLResponse)
