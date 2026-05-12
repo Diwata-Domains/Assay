@@ -113,7 +113,8 @@ def test_run_auto_detects_task_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 def test_run_no_task_id_packet_has_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GRAIN_TASK_ID", raising=False)
     mock_result = _make_runner_result(tmp_path)
-    with patch("assay.runner.runner.run", return_value=mock_result):
+    with patch("assay.runner.runner.run", return_value=mock_result), \
+         patch("assay.grain.detect.detect_task_id", return_value=None):
         result = runner.invoke(cli_app, [
             "run", "--target", "https://example.com", "--output", str(tmp_path),
         ])

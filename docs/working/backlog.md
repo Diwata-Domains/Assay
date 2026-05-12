@@ -240,7 +240,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P20-T01 — Admin credentials config (env vars + assay admin set-password)
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0052
 
 ### P20-T02 — Login page + JWT cookie session (GET /login, POST /login, GET /logout)
 

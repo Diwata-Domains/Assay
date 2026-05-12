@@ -25,10 +25,12 @@ app = typer.Typer(
 schedule_app = typer.Typer(help="Manage scheduled test runs.")
 key_app = typer.Typer(help="Manage API keys for the ingest endpoint.")
 store_app = typer.Typer(help="Manage the SQLite packet store.")
+admin_app = typer.Typer(help="Admin credential management.")
 
 app.add_typer(schedule_app, name="schedule")
 app.add_typer(key_app, name="key")
 app.add_typer(store_app, name="store")
+app.add_typer(admin_app, name="admin")
 
 _NOT_IMPLEMENTED = "not implemented"
 
@@ -505,3 +507,25 @@ def store_import(
 
     count = import_packets(packets, db_path)
     typer.echo(f"imported: {count} packet(s)")
+
+
+# admin
+
+
+@admin_app.command("set-password")
+def admin_set_password() -> None:
+    """Hash a password for use as ASSAY_ADMIN_PASSWORD_HASH."""
+    import getpass
+
+    from assay.auth.admin import hash_password
+
+    password = getpass.getpass("Password: ")
+    if not password:
+        typer.echo("error: password cannot be empty", err=True)
+        raise typer.Exit(1)
+    confirm = getpass.getpass("Confirm password: ")
+    if password != confirm:
+        typer.echo("error: passwords do not match", err=True)
+        raise typer.Exit(1)
+    hashed = hash_password(password)
+    typer.echo(f"\nAdd this to your .env:\n\nASSAY_ADMIN_PASSWORD_HASH={hashed}")
