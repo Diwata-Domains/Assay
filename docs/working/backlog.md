@@ -245,11 +245,12 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P20-T02 — Login page + JWT cookie session (GET /login, POST /login, GET /logout)
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0053
 
 ### P20-T03 — Auth middleware protecting dashboard routes
 
-- **Status:** pending
+- **Status:** ready
 
 ### P20-T04 — Key management UI (list, create, revoke from browser)
 
