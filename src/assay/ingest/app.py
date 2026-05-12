@@ -412,6 +412,114 @@ async def verification_status(verification_id: str, request: Request) -> dict[st
     }
 
 
+_KEYS_STYLE = (
+    "body{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}"
+    "h1{color:#fff;border-bottom:1px solid #333;padding-bottom:.5rem}"
+    "a{color:#90caf9;text-decoration:none}"
+    "table{border-collapse:collapse;width:100%;margin:1rem 0}"
+    "th{text-align:left;padding:.4rem .75rem;background:#1a1a1a;border-bottom:2px solid #333;font-size:.85rem}"
+    "td{padding:.35rem .75rem;border-bottom:1px solid #1e1e1e;font-size:.85rem}"
+    "form.inline{display:inline}"
+    "button{background:#2a2a2a;border:1px solid #444;color:#e0e0e0;padding:.3rem .75rem;"
+    "border-radius:4px;font-family:monospace;font-size:.85rem;cursor:pointer}"
+    "button:hover{background:#333}"
+    "button.danger{border-color:#c62828;color:#ef9a9a}"
+    "button.danger:hover{background:#1a0000}"
+    ".create-form{margin:1.5rem 0;display:flex;gap:.75rem;align-items:center}"
+    ".create-form input{background:#0d0d0d;border:1px solid #333;color:#e0e0e0;"
+    "padding:.4rem .6rem;border-radius:4px;font-family:monospace;font-size:.85rem}"
+    ".create-form input:focus{outline:none;border-color:#555}"
+    ".new-key{background:#0a1a0a;border:1px solid #2e7d32;border-radius:4px;"
+    "padding:.75rem 1rem;margin:1rem 0;font-size:.9rem}"
+    ".new-key .label{color:#81c784;font-size:.8rem;margin-bottom:.4rem}"
+    ".new-key code{color:#a5d6a7;word-break:break-all}"
+    ".revoked{color:#555}"
+)
+
+
+def _keys_page(
+    key_store: str,
+    new_key: str = "",
+    new_label: str = "",
+) -> str:
+    from assay.keys.store import list_keys as _list
+
+    keys = _list(key_store)
+    new_key_html = ""
+    if new_key:
+        new_key_html = (
+            "<div class='new-key'>"
+            f"<div class='label'>New key for <strong>{new_label}</strong> — copy it now, it won't be shown again</div>"
+            f"<code>{new_key}</code>"
+            "</div>"
+        )
+
+    rows = ""
+    active = [k for k in keys if not k.get("revoked")]
+    if not active:
+        rows = '<tr><td colspan="3" style="text-align:center;color:#555">no active keys</td></tr>'
+    else:
+        for k in active:
+            kid = str(k["id"])
+            label = str(k["label"])
+            created = str(k["created_at"])[:10]
+            rows += (
+                f"<tr>"
+                f"<td>{label}</td>"
+                f"<td>{created}</td>"
+                f"<td>"
+                f"<form class='inline' method='post' action='/keys/{kid}/revoke'>"
+                f"<button class='danger' type='submit'>Revoke</button>"
+                f"</form>"
+                f"</td>"
+                f"</tr>"
+            )
+
+    return (
+        "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
+        "<title>Assay — API Keys</title>"
+        f"<style>{_KEYS_STYLE}</style></head><body>"
+        "<h1><a href='/'>Assay</a> / API Keys</h1>"
+        f"{new_key_html}"
+        "<form class='create-form' method='post' action='/keys'>"
+        "<input type='text' name='label' placeholder='Key label (e.g. crm-prod)' required>"
+        "<button type='submit'>Create key</button>"
+        "</form>"
+        "<table><thead><tr><th>label</th><th>created</th><th></th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+        "<p style='margin-top:2rem'><a href='/logout'>Sign out</a></p>"
+        "</body></html>"
+    )
+
+
+@app.get("/keys", response_class=HTMLResponse)
+async def keys_list(request: Request) -> HTMLResponse:
+    return HTMLResponse(_keys_page(request.app.state.key_store))
+
+
+@app.post("/keys", response_model=None)
+async def keys_create(
+    request: Request,
+    label: str = Form(...),
+) -> HTMLResponse:
+    from assay.keys.store import create_key as _create
+
+    raw = _create(request.app.state.key_store, label.strip() or None)
+    return HTMLResponse(_keys_page(request.app.state.key_store, new_key=raw, new_label=label.strip()))
+
+
+@app.post("/keys/{key_id}/revoke")
+async def keys_revoke(key_id: str, request: Request) -> RedirectResponse:
+    from assay.keys.store import KeyStoreError
+    from assay.keys.store import revoke_key as _revoke
+
+    try:
+        _revoke(request.app.state.key_store, key_id)
+    except KeyStoreError:
+        pass
+    return RedirectResponse(url="/keys", status_code=303)
+
+
 def _store_ingest_packet(packet: dict[str, object], store_db: str) -> None:
     from pathlib import Path as _Path
 
