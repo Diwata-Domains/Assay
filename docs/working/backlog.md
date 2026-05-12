@@ -289,7 +289,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P21-T05 — assay run --compare: diff against baseline from CLI, exit 1 on regression
 
-- **Status:** pending
+- **Status:** done
+- **Task ID:** TASK-0061
 
 ---
 
