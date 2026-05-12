@@ -255,11 +255,12 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P20-T04 — Key management UI (list, create, revoke from browser)
 
-- **Status:** ready
+- **Status:** done
+- **Task ID:** TASK-0055
 
 ### P20-T05 — Deployment config (Dockerfile, docker-compose, nginx, .env.example)
 
-- **Status:** pending
+- **Status:** ready
 
 ---
 
