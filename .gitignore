@@ -13,3 +13,5 @@ build/
 .env
 sdk/node_modules/
 sdk/dist/
+assay-output/
+.DS_Store
