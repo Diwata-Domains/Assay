@@ -299,18 +299,22 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 ### P22-T01 — Test script format: define steps (navigate, click, fill, screenshot) in a JS/TS file
 
 - **Status:** pending
+- **Task ID:** TASK-0062
 
 ### P22-T02 — assay run --script <file>: execute script in Docker runner
 
 - **Status:** pending
+- **Task ID:** TASK-0063
 
 ### P22-T03 — Script result packet: capture step-by-step screenshots + pass/fail per step
 
 - **Status:** pending
+- **Task ID:** TASK-0064
 
 ### P22-T04 — Script library: built-in helpers (login flow, form fill, wait for selector)
 
 - **Status:** pending
+- **Task ID:** TASK-0065
 
 ---
 
