@@ -1,5 +1,6 @@
 """CLI entrypoint tests."""
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -7,7 +8,11 @@ from typer.testing import CliRunner
 from assay import __version__
 from assay.cli.main import app
 
-runner = CliRunner(env={"NO_COLOR": "1"})
+runner = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb"})
+
+
+def _plain(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def test_version() -> None:
@@ -19,7 +24,7 @@ def test_version() -> None:
 def test_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "--verbose" in result.output
+    assert "--verbose" in _plain(result.output)
 
 
 def test_verbose_flag() -> None:
