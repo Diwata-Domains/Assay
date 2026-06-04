@@ -67,6 +67,7 @@ app.state.output_dir = "./assay-output"
 app.state.store_db = "~/.assay/store.db"
 
 from assay.api.mcp import router as _mcp_router  # noqa: E402
+
 app.include_router(_mcp_router)
 
 
