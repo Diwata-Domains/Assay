@@ -19,7 +19,7 @@ from assay.formatter.writer import write_packet
 from assay.keys.store import verify_key
 
 _PROTECTED_PREFIXES = ("/", "/packet/", "/keys")
-_PUBLIC_PATHS = {"/login", "/logout", "/ingest", "/docs", "/openapi.json"}
+_PUBLIC_PATHS = {"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}
 _PUBLIC_PREFIXES = ("/status/",)
 
 
@@ -69,6 +69,11 @@ app.state.store_db = "~/.assay/store.db"
 from assay.api.mcp import router as _mcp_router  # noqa: E402
 
 app.include_router(_mcp_router)
+
+
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok", "service": "assay"}
 
 
 class Viewport(BaseModel):
