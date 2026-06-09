@@ -2,7 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir assay-kit
+# Install from local source — PyPI assay-kit is behind the monorepo
+COPY pyproject.toml ./
+COPY src/ ./src/
+
+RUN pip install --no-cache-dir .
 
 RUN mkdir -p /data/assay-output
 
@@ -10,9 +14,7 @@ ENV ASSAY_ADMIN_EMAIL=""
 ENV ASSAY_ADMIN_PASSWORD_HASH=""
 ENV ASSAY_JWT_SECRET=""
 
-# assay.toml picks these up via [keys], [store], [output] sections
-# Override by mounting a config or setting env ASSAY_CONFIG
-COPY assay.container.toml /etc/assay/assay.toml
+COPY deploy/assay.container.toml /etc/assay/assay.toml
 
 EXPOSE 8000
 
