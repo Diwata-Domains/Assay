@@ -1,25 +1,24 @@
 # Current Focus
 
 ## Current Phase
-Phase 21 — Visual Regression Testing
+Phase 22 — Developer Experience + SDK Integration
 
 ---
 
 ## Active Focus
 
-Phase 20 complete: hosted dashboard with single-admin login, key management UI, deployment config.
+Phase 21 complete: visual regression, pixel diff engine, approve/reject workflow, `assay run --compare`.
 
-Phase 21: visual regression — baseline capture, pixel diff, approve/reject workflow.
+Phase 22: remove setup friction. Goal is a 2-minute path from `pip install assay-kit` to first captured packet, and a clean SDK integration story for app projects (Vite/React, Next.js).
 
 ---
 
 ## Immediate Priorities
 
-1. P21-T01: Baseline capture — mark a packet as the approved baseline for a URL
-2. P21-T02: Pixel diff engine
-3. P21-T03: Diff view in dashboard
-4. P21-T04: Approve/reject workflow
-5. P21-T05: assay run --compare
+1. P22-T01: `assay init` — interactive wizard writes `assay.toml` + prints `.env` block
+2. P22-T02: `assay key create` UX — print curl example + SDK snippet after key creation
+3. P22-T03: SDK `fromEnv()` factory + `useAssayCapture()` React hook
+4. P22-T04: Framework-specific setup guides in `packages/assay-sdk/docs/`
 
 ---
 

@@ -294,101 +294,134 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ---
 
-## 22. Phase 22 — Multi-step Playwright Test Scripts
+## 22. Phase 22 — Developer Experience + SDK Integration
 
-### P22-T01 — Test script format: define steps (navigate, click, fill, screenshot) in a JS/TS file
+**Goal:** Remove the friction from first-time setup, API key creation, and SDK integration in app projects. The current flow requires knowing about assay.toml, generating bcrypt hashes manually, and wiring up the SDK without obvious guidance. This phase makes the full setup a guided 2-minute flow.
+
+### P22-T01 — `assay init`: interactive first-run setup wizard
+
+- **Status:** ready
+- Prompts for output dir, admin email, admin password (hashes inline), ingest port
+- Writes `assay.toml` and prints `.env` block ready to paste
+- Idempotent — safe to re-run; won't overwrite existing config without confirmation
+
+### P22-T02 — `assay key create` UX: print curl example + SDK snippet with new key
+
+- **Status:** ready
+- After printing the raw key, print a ready-to-use curl example and SDK constructor snippet
+- Makes the key immediately usable without hunting docs
+
+### P22-T03 — SDK: `AssaySDK.fromEnv()` factory + cleaner integration for app projects
+
+- **Status:** ready
+- Add static `fromEnv()` that reads `ASSAY_ENDPOINT` and `ASSAY_API_KEY` env vars
+- Add `useAssayCapture()` React hook in a new `@diwata-labs/assay-sdk/react` export
+- Keep the existing constructor — `fromEnv()` is additive
+
+### P22-T04 — SDK setup guide: framework-specific integration examples
+
+- **Status:** ready
+- Vite/React quickstart: env vars, hook usage, capture on button press
+- Next.js quickstart: server-side key, client-side capture component
+- Lives in `packages/assay-sdk/docs/` — not a README wall of text
+
+---
+
+## 23. Phase 23 — Multi-step Playwright Test Scripts
+
+### P23-T01 — Test script format: define steps (navigate, click, fill, screenshot) in a JS/TS file
 
 - **Status:** pending
 - **Task ID:** TASK-0062
 
-### P22-T02 — assay run --script <file>: execute script in Docker runner
+### P23-T02 — assay run --script <file>: execute script in Docker runner
 
 - **Status:** pending
 - **Task ID:** TASK-0063
 
-### P22-T03 — Script result packet: capture step-by-step screenshots + pass/fail per step
+### P23-T03 — Script result packet: capture step-by-step screenshots + pass/fail per step
 
 - **Status:** pending
 - **Task ID:** TASK-0064
 
-### P22-T04 — Script library: built-in helpers (login flow, form fill, wait for selector)
+### P23-T04 — Script library: built-in helpers (login flow, form fill, wait for selector)
 
 - **Status:** pending
 - **Task ID:** TASK-0065
 
 ---
 
-## 23. Phase 23 — CI/CD Integration
+## 24. Phase 24 — CI/CD Integration
 
-### P23-T01 — GitHub Actions action (diwata/assay-action@v1): run assay on PR
-
-- **Status:** pending
-
-### P23-T02 — PR comment: post screenshot + diff summary as a PR comment
+### P24-T01 — GitHub Actions action (diwata/assay-action@v1): run assay on PR
 
 - **Status:** pending
 
-### P23-T03 — Status check: fail PR check if regression detected, pass if clean
+### P24-T02 — PR comment: post screenshot + diff summary as a PR comment
 
 - **Status:** pending
 
-### P23-T04 — assay ci config: assay.toml [ci] section for check behaviour and thresholds
+### P24-T03 — Status check: fail PR check if regression detected, pass if clean
 
 - **Status:** pending
 
----
-
-## 24. Phase 24 — Multi-viewport Testing
-
-### P24-T01 — assay run --viewports mobile,tablet,desktop: run same test at multiple widths
-
-- **Status:** pending
-
-### P24-T02 — Viewport results in dashboard: side-by-side view per capture session
-
-- **Status:** pending
-
-### P24-T03 — Viewport regression: diff per viewport independently, separate approve/reject
+### P24-T04 — assay ci config: assay.toml [ci] section for check behaviour and thresholds
 
 - **Status:** pending
 
 ---
 
-## 25. Phase 25 — Alerts + Webhooks
+## 25. Phase 25 — Multi-viewport Testing
 
-### P25-T01 — Webhook config: assay.toml [alerts] with URL + events (fail, regression, pass)
-
-- **Status:** pending
-
-### P25-T02 — Webhook delivery: POST JSON payload on triggered events
+### P25-T01 — assay run --viewports mobile,tablet,desktop: run same test at multiple widths
 
 - **Status:** pending
 
-### P25-T03 — Slack integration: pre-built Slack webhook format with screenshot link
+### P25-T02 — Viewport results in dashboard: side-by-side view per capture session
 
 - **Status:** pending
 
-### P25-T04 — Email alerts: SMTP config + HTML email on failure or regression
+### P25-T03 — Viewport regression: diff per viewport independently, separate approve/reject
 
 - **Status:** pending
 
 ---
 
-## 26. Phase 26 — Multi-user + Org Accounts
+## 26. Phase 26 — Alerts + Webhooks
 
-### P26-T01 — User registration + login: email/password accounts, JWT sessions
-
-- **Status:** pending
-
-### P26-T02 — Org model: users belong to an org, data isolated per org
+### P26-T01 — Webhook config: assay.toml [alerts] with URL + events (fail, regression, pass)
 
 - **Status:** pending
 
-### P26-T03 — Invite flow: invite teammates by email, accept via link
+### P26-T02 — Webhook delivery: POST JSON payload on triggered events
 
 - **Status:** pending
 
-### P26-T04 — Per-key access scoping: restrict API keys to specific projects or users
+### P26-T03 — Slack integration: pre-built Slack webhook format with screenshot link
+
+- **Status:** pending
+
+### P26-T04 — Email alerts: SMTP config + HTML email on failure or regression
+
+- **Status:** pending
+
+---
+
+## 27. Phase 27 — Multi-user + Org Accounts
+
+### P27-T01 — User registration + login: email/password accounts, JWT sessions
+
+- **Status:** pending
+
+### P27-T02 — Org model: users belong to an org, data isolated per org
+
+- **Status:** pending
+
+### P27-T03 — Invite flow: invite teammates by email, accept via link
+
+- **Status:** pending
+
+### P27-T04 — Per-key access scoping: restrict API keys to specific projects or users
 
 - **Status:** pending
 
