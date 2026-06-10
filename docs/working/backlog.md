@@ -300,30 +300,30 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P22-T01 — `assay init`: interactive first-run setup wizard
 
-- **Status:** ready
+- **Status:** done
 - Prompts for output dir, admin email, admin password (hashes inline), ingest port
 - Writes `assay.toml` and prints `.env` block ready to paste
 - Idempotent — safe to re-run; won't overwrite existing config without confirmation
 
 ### P22-T02 — `assay key create` UX: print curl example + SDK snippet with new key
 
-- **Status:** ready
+- **Status:** done
 - After printing the raw key, print a ready-to-use curl example and SDK constructor snippet
 - Makes the key immediately usable without hunting docs
 
 ### P22-T03 — SDK: `AssaySDK.fromEnv()` factory + cleaner integration for app projects
 
-- **Status:** ready
+- **Status:** done
 - Add static `fromEnv()` that reads `ASSAY_ENDPOINT` and `ASSAY_API_KEY` env vars
 - Add `useAssayCapture()` React hook in a new `@diwata-labs/assay-sdk/react` export
 - Keep the existing constructor — `fromEnv()` is additive
 
 ### P22-T04 — SDK setup guide: framework-specific integration examples
 
-- **Status:** ready
+- **Status:** done
 - Vite/React quickstart: env vars, hook usage, capture on button press
 - Next.js quickstart: server-side key, client-side capture component
-- Lives in `packages/assay-sdk/docs/` — not a README wall of text
+- Lives in `packages/assay-sdk/docs/`
 
 ---
 
