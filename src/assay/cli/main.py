@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import getpass
+import secrets
 import shutil
 from pathlib import Path
 from typing import Optional, cast
@@ -33,6 +35,73 @@ app.add_typer(store_app, name="store")
 app.add_typer(admin_app, name="admin")
 
 _NOT_IMPLEMENTED = "not implemented"
+
+_TOML_TEMPLATE = """\
+[project]
+name = "{name}"
+
+[output]
+directory = "{output_dir}"
+
+[serve]
+host = "0.0.0.0"
+port = {port}
+
+[keys]
+store = "~/.assay/keys.json"
+
+[store]
+db = "~/.assay/store.db"
+
+[schedule]
+store = "~/.assay/schedules.json"
+"""
+
+
+@app.command()
+def init(
+    force: bool = typer.Option(False, "--force", help="Overwrite existing assay.toml without prompting."),
+) -> None:
+    """Interactive first-run setup: write assay.toml and print .env block."""
+    config_path = Path("assay.toml")
+
+    if config_path.exists() and not force:
+        overwrite = typer.confirm(f"{config_path} already exists. Overwrite?", default=False)
+        if not overwrite:
+            typer.echo("Aborted.")
+            raise typer.Exit(0)
+
+    typer.echo("Setting up Assay. Press Enter to accept defaults.\n")
+
+    name = typer.prompt("Project name", default=Path.cwd().name)
+    output_dir = typer.prompt("Output directory", default="./assay-output")
+    port = typer.prompt("Serve port", default=8000)
+    admin_email = typer.prompt("Admin email")
+
+    password = getpass.getpass("Admin password: ")
+    if not password:
+        typer.echo("error: password cannot be empty", err=True)
+        raise typer.Exit(1)
+    confirm = getpass.getpass("Confirm password: ")
+    if password != confirm:
+        typer.echo("error: passwords do not match", err=True)
+        raise typer.Exit(1)
+
+    from assay.auth.admin import hash_password
+    password_hash = hash_password(password)
+    jwt_secret = secrets.token_urlsafe(32)
+
+    config_path.write_text(
+        _TOML_TEMPLATE.format(name=name, output_dir=output_dir, port=port),
+        encoding="utf-8",
+    )
+
+    typer.echo(f"\nassay.toml written.\n")
+    typer.echo("Add these to your .env (do not commit this file):\n")
+    typer.echo(f"ASSAY_ADMIN_EMAIL={admin_email}")
+    typer.echo(f"ASSAY_ADMIN_PASSWORD_HASH={password_hash}")
+    typer.echo(f"ASSAY_JWT_SECRET={jwt_secret}")
+    typer.echo("\nRun:  assay serve")
 
 
 @app.callback()
@@ -494,8 +563,14 @@ def key_create(
     except KeyStoreError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
-    typer.echo(f"key: {raw}")
-    typer.echo("Save this key — it will not be shown again.")
+    typer.echo(f"\nkey: {raw}")
+    typer.echo("Save this key — it will not be shown again.\n")
+    typer.echo("Test it:")
+    typer.echo(f'  curl -sf <your-assay-endpoint>/health -H "X-Assay-Key: {raw}"\n')
+    typer.echo("SDK (TypeScript):")
+    typer.echo( "  import { AssaySDK } from '@diwata-labs/assay-sdk'")
+    typer.echo(f"  const assay = AssaySDK.fromEnv()  // set ASSAY_API_KEY={raw} ASSAY_ENDPOINT=<url>")
+    typer.echo( "  await assay.capture({ comment: 'first capture' })")
 
 
 @key_app.command("list")
