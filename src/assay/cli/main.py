@@ -96,7 +96,7 @@ def init(
         encoding="utf-8",
     )
 
-    typer.echo(f"\nassay.toml written.\n")
+    typer.echo("\nassay.toml written.\n")
     typer.echo("Add these to your .env (do not commit this file):\n")
     typer.echo(f"ASSAY_ADMIN_EMAIL={admin_email}")
     typer.echo(f"ASSAY_ADMIN_PASSWORD_HASH={password_hash}")
