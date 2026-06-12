@@ -50,6 +50,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+assay = ["runner/runner_script.js"]
+
 [tool.ruff]
 src = ["src"]
 line-length = 120

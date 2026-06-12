@@ -151,6 +151,7 @@ def run(
         False, "--compare", help="Diff screenshot against stored baseline; exit 1 on regression."
     ),
     threshold: float = typer.Option(0.1, "--threshold", help="Regression threshold as % changed pixels (default 0.1)."),
+    no_docker: bool = typer.Option(False, "--no-docker", help="Run Playwright directly via Node.js (requires node + playwright installed)."),
 ) -> None:
     """Execute a test run using the Playwright + Docker runner.
 
@@ -168,6 +169,7 @@ def run(
             task_id=task_id,
             verification_id=verification_id,
             submit=submit,
+            no_docker=no_docker,
         )
         return
 
@@ -185,7 +187,10 @@ def run(
         typer.echo(f"task_id: {effective_task_id}")
 
     def _do_run() -> str:
-        runner_result = _runner.run(target, suite=suite, output_dir=output_dir, image=image)
+        if no_docker:
+            runner_result = _runner.run_direct(target, suite=suite, output_dir=output_dir)
+        else:
+            runner_result = _runner.run(target, suite=suite, output_dir=output_dir, image=image)
         try:
             bundle = _artifacts.collect_artifacts(runner_result.output_dir, runner_result)
         except _artifacts.ArtifactError as exc:
@@ -252,6 +257,7 @@ def _run_script_mode(
     task_id: Optional[str],  # noqa: UP007
     verification_id: Optional[str],  # noqa: UP007
     submit: bool,
+    no_docker: bool = False,
 ) -> None:
     """Execute a multi-step Assay script and write a structured result packet."""
     from assay.scripts.parser import ScriptParseError, parse_script
@@ -274,37 +280,40 @@ def _run_script_mode(
     image = config.runner.docker_image
 
     from assay.grain.detect import detect_task_id
+    from assay.runner.artifacts import collect_artifacts
+    from assay.runner import runner as _runner_mod
+
     effective_task_id = task_id or detect_task_id(config.grain.project_root or None)
 
-    docker_cmd = _find_docker_binary()
-    if docker_cmd is None:
-        typer.echo("error: docker not found — required for script runs", err=True)
-        raise typer.Exit(1)
-
-    import subprocess, tempfile
+    import tempfile
     run_output_dir = output_dir or tempfile.mkdtemp(prefix="assay-script-")
     Path(run_output_dir).mkdir(parents=True, exist_ok=True)
 
-    cmd = [
-        docker_cmd, "run", "--rm",
-        "-e", f"ASSAY_SCRIPT_FILE=/scripts/{script_file.name}",
-        "-e", f"ASSAY_SUITE={suite}",
-        "-e", "ASSAY_OUTPUT_DIR=/output",
-        "-v", f"{run_output_dir}:/output",
-        "-v", f"{script_file.parent.resolve()}:/scripts:ro",
-        image,
-    ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    from assay.runner.runner import RunResult
-    from assay.runner.artifacts import collect_artifacts
-    runner_result = RunResult(
-        exit_code=result.returncode,
-        output_dir=run_output_dir,
-        stdout=result.stdout,
-        stderr=result.stderr,
-    )
+    if no_docker:
+        runner_result = _runner_mod.run_script_direct(script_file, suite=suite, output_dir=run_output_dir)
+    else:
+        import subprocess
+        docker_cmd = _find_docker_binary()
+        if docker_cmd is None:
+            typer.echo("error: docker not found — use --no-docker to run without Docker", err=True)
+            raise typer.Exit(1)
+        cmd = [
+            docker_cmd, "run", "--rm",
+            "-e", f"ASSAY_SCRIPT_FILE=/scripts/{script_file.name}",
+            "-e", f"ASSAY_SUITE={suite}",
+            "-e", "ASSAY_OUTPUT_DIR=/output",
+            "-v", f"{run_output_dir}:/output",
+            "-v", f"{script_file.parent.resolve()}:/scripts:ro",
+            image,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        from assay.runner.runner import RunResult
+        runner_result = RunResult(
+            exit_code=result.returncode,
+            output_dir=run_output_dir,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
 
     try:
         bundle = collect_artifacts(run_output_dir, runner_result)
