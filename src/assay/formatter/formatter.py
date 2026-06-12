@@ -57,7 +57,12 @@ def format_packet(
     """
     artifact_refs: list[str] = [bundle.screenshot_path] if bundle.screenshot_path else []
 
-    return {
+    # Collect all step screenshots into artifact_refs
+    for step in bundle.steps:
+        if step.screenshot_path and step.screenshot_path not in artifact_refs:
+            artifact_refs.append(step.screenshot_path)
+
+    packet: dict[str, object] = {
         "verification_id": verification_id if verification_id else str(uuid.uuid4()),
         "task_id": task_id,
         "issue_type": _ISSUE_TYPE_MAP.get(bundle.outcome, "test_failure"),
@@ -68,6 +73,22 @@ def format_packet(
         "followup_candidates": [],
         "verified_at": _verified_at(bundle),
     }
+
+    if bundle.steps:
+        packet["script_name"] = bundle.script_name
+        packet["steps"] = [
+            {
+                "index": s.index,
+                "type": s.type,
+                "label": s.label,
+                "outcome": s.outcome,
+                "error": s.error,
+                "screenshot": s.screenshot_path,
+            }
+            for s in bundle.steps
+        ]
+
+    return packet
 
 
 def format_sdk_packet(

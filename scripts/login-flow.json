@@ -1,0 +1,12 @@
+{
+  "name": "Login flow",
+  "steps": [
+    { "type": "navigate",   "url": "https://your-app.example.com/login" },
+    { "type": "screenshot", "label": "login-page" },
+    { "type": "fill",       "selector": "[name=email]",    "value": "user@example.com" },
+    { "type": "fill",       "selector": "[name=password]", "value": "your-password" },
+    { "type": "click",      "selector": "[type=submit]" },
+    { "type": "wait_for",   "selector": ".dashboard, .home, [data-page=home]", "timeout": 8000 },
+    { "type": "screenshot", "label": "after-login" }
+  ]
+}

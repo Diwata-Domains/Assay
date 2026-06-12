@@ -1,0 +1,11 @@
+{
+  "name": "Page smoke test",
+  "steps": [
+    { "type": "navigate",   "url": "https://your-app.example.com" },
+    { "type": "screenshot", "label": "homepage" },
+    { "type": "navigate",   "url": "https://your-app.example.com/about" },
+    { "type": "screenshot", "label": "about" },
+    { "type": "navigate",   "url": "https://your-app.example.com/pricing" },
+    { "type": "screenshot", "label": "pricing" }
+  ]
+}

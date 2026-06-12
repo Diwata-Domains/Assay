@@ -139,6 +139,7 @@ def main(
 def run(
     ctx: typer.Context,
     target: Optional[str] = typer.Option(None, "--target", help="URL or target to test."),  # noqa: UP007
+    script: Optional[str] = typer.Option(None, "--script", help="Path to an Assay script JSON file (multi-step run)."),  # noqa: UP007
     suite: str = typer.Option("default", "--suite", help="Test suite name."),
     output: Optional[str] = typer.Option(None, "--output", help="Output directory."),  # noqa: UP007
     task_id: Optional[str] = typer.Option(None, "--task-id", help="Grain task ID to tag this run."),  # noqa: UP007
@@ -151,11 +152,27 @@ def run(
     ),
     threshold: float = typer.Option(0.1, "--threshold", help="Regression threshold as % changed pixels (default 0.1)."),
 ) -> None:
-    """Execute a test run using the Playwright + Docker runner."""
+    """Execute a test run using the Playwright + Docker runner.
+
+    Single-URL mode:   assay run --target https://example.com
+    Multi-step mode:   assay run --script login-flow.json
+    """
     from assay.grain.detect import detect_task_id
 
+    if script is not None:
+        _run_script_mode(
+            ctx=ctx,
+            script_path=script,
+            suite=suite,
+            output=output,
+            task_id=task_id,
+            verification_id=verification_id,
+            submit=submit,
+        )
+        return
+
     if target is None:
-        typer.echo("error: --target is required", err=True)
+        typer.echo("error: --target or --script is required", err=True)
         raise typer.Exit(2)
 
     config: AssayConfig = ctx.obj
@@ -225,6 +242,103 @@ def run(
     except KeyboardInterrupt:
         typer.echo("\nwatch stopped")
         raise typer.Exit(0)
+
+
+def _run_script_mode(
+    ctx: typer.Context,
+    script_path: str,
+    suite: str,
+    output: Optional[str],  # noqa: UP007
+    task_id: Optional[str],  # noqa: UP007
+    verification_id: Optional[str],  # noqa: UP007
+    submit: bool,
+) -> None:
+    """Execute a multi-step Assay script and write a structured result packet."""
+    from assay.scripts.parser import ScriptParseError, parse_script
+
+    script_file = Path(script_path)
+    if not script_file.exists():
+        typer.echo(f"error: script file not found: {script_path}", err=True)
+        raise typer.Exit(2)
+
+    try:
+        assay_script = parse_script(script_file)
+    except ScriptParseError as exc:
+        typer.echo(f"error: invalid script: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    typer.echo(f"script: {assay_script.name} ({len(assay_script.steps)} steps)")
+
+    config: AssayConfig = ctx.obj
+    output_dir = output or config.output.directory
+    image = config.runner.docker_image
+
+    from assay.grain.detect import detect_task_id
+    effective_task_id = task_id or detect_task_id(config.grain.project_root or None)
+
+    docker_cmd = _find_docker_binary()
+    if docker_cmd is None:
+        typer.echo("error: docker not found — required for script runs", err=True)
+        raise typer.Exit(1)
+
+    import subprocess, tempfile
+    run_output_dir = output_dir or tempfile.mkdtemp(prefix="assay-script-")
+    Path(run_output_dir).mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        docker_cmd, "run", "--rm",
+        "-e", f"ASSAY_SCRIPT_FILE=/scripts/{script_file.name}",
+        "-e", f"ASSAY_SUITE={suite}",
+        "-e", "ASSAY_OUTPUT_DIR=/output",
+        "-v", f"{run_output_dir}:/output",
+        "-v", f"{script_file.parent.resolve()}:/scripts:ro",
+        image,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    from assay.runner.runner import RunResult
+    from assay.runner.artifacts import collect_artifacts
+    runner_result = RunResult(
+        exit_code=result.returncode,
+        output_dir=run_output_dir,
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )
+
+    try:
+        bundle = collect_artifacts(run_output_dir, runner_result)
+    except Exception as exc:
+        typer.echo(f"error reading script artifacts: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    # Print step summary
+    for step in bundle.steps:
+        icon = "✓" if step.outcome == "pass" else "✗"
+        shot = f" [{step.screenshot_path}]" if step.screenshot_path else ""
+        err_detail = f" — {step.error}" if step.error else ""
+        typer.echo(f"  {icon} step {step.index}: {step.label}{err_detail}{shot}")
+
+    typer.echo(f"outcome: {bundle.outcome}")
+
+    packet = format_packet(bundle, task_id=effective_task_id, verification_id=verification_id)
+    packet_path = write_packet(packet, run_output_dir)
+    typer.echo(f"packet: {packet_path}")
+    _store_packet(packet, config)
+
+    if submit:
+        _do_submit(str(packet_path), config)
+
+    raise typer.Exit(0 if bundle.outcome == "pass" else 1)
+
+
+def _find_docker_binary() -> Optional[str]:  # noqa: UP007
+    """Return docker binary path or None."""
+    try:
+        from assay.runner.runner import _find_docker
+        return _find_docker()
+    except FileNotFoundError:
+        return None
 
 
 def _do_compare(
