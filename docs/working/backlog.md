@@ -371,60 +371,144 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ---
 
-## 25. Phase 25 — Multi-viewport Testing
+## 25. Phase 25 — Functional + Integration Checks
 
-### P25-T01 — assay run --viewports mobile,tablet,desktop: run same test at multiple widths
+**Goal:** Elevate Assay from a screenshot tool into a genuine verifier. Operators define named checks in `assay.toml` — HTTP assertions, header/CORS checks, auth enforcement, Playwright functional assertions, and JS console error detection. Failures produce structured results alongside visual packets.
+
+### P25-T01 — `assay check` command + `[checks]` config block in assay.toml
+
+- **Status:** pending
+- `assay check` runs all named checks defined under `[checks]` in `assay.toml`
+- Each check has: `id`, `type` (http | header | auth | functional), `target` URL, and assertion fields
+- Results written to SQLite store and printed as pass/fail table
+- `--check <id>` flag to run a single named check
+
+### P25-T02 — HTTP assertion engine
+
+- **Status:** pending
+- Assert: status code, response time threshold, body contains string, body matches JSON path
+- Example: `GET /health` → expect `200`; `GET /brief` → expect body contains `"repos"`
+- Exit 1 if any assertion fails; structured result packet per check
+
+### P25-T03 — Header + security config checks
+
+- **Status:** pending
+- Assert header present/absent and value (e.g. `Access-Control-Allow-Origin`, `Content-Type`, `X-Frame-Options`)
+- Assert auth enforcement: protected route returns 401/403 without credentials, 200 with valid key
+- Covers the class of errors previously caught only by reading browser console (CORS missing, wrong content-type)
+
+### P25-T04 — Playwright functional assertions in scripts
+
+- **Status:** pending
+- Extend Phase 23 scripts with assertion steps: `expect(page).toHaveText()`, `toBeVisible()`, `toHaveURL()`, `not.toHaveText()`
+- Console error detection: script fails if `console.error()` fires during page load or step execution
+- Step-level pass/fail in result packet
+
+### P25-T05 — Check results in dashboard + report output
+
+- **Status:** pending
+- Dashboard shows check results in a dedicated tab: id, type, target, pass/fail, assertion detail, timestamp
+- `assay report` includes check results alongside visual packets
+- JSON output includes `checks` array with structured result per check
+
+---
+
+## 26. Phase 26 — Auto Grain Task on Failure
+
+**Goal:** Close the Grain ↔ Assay loop automatically. When a run detects a regression or a check fails, Assay creates a Grain task in the configured repo — no manual `assay submit` step required.
+
+### P26-T01 — `[grain]` config section in assay.toml
+
+- **Status:** pending
+- Fields: `repo` (path to Grain repo root), `auto_create` (bool), `phase` (optional phase hint), `branch` (optional branch to write task on)
+- Extends the existing `[grain]` section from Phase 18
+
+### P26-T02 — Auto-create Grain task on visual regression
+
+- **Status:** pending
+- When `assay run --compare` detects a regression: create a Grain task with diff image attached, URL, baseline vs current screenshot, timestamp
+- Task title: `Visual regression: <url> — <check_id or run_id>`
+
+### P26-T03 — Auto-create Grain task on check failure
+
+- **Status:** pending
+- When `assay check` produces any failing result: create a Grain task per failing check
+- Task includes: check id, type, target URL, assertion that failed, actual vs expected value
+- Covers HTTP 500s, missing CORS headers, auth not enforced, console errors, functional assertion failures
+
+### P26-T04 — Task deduplication
+
+- **Status:** pending
+- Before creating a task, check if an open Grain task already exists for the same check id + target
+- Skip creation if duplicate; log deduplication decision in check result
+
+### P26-T05 — Suggested remediation in task content
+
+- **Status:** pending
+- Each auto-created task includes a `remediation` field with a plain-language suggestion
+- Example: CORS failure → "Add `Access-Control-Allow-Origin: https://apex.diwata.domains` to the response headers"
+- Follows the same remediation pattern as `grain workflow guard`
+
+---
+
+## v0.4.0
+
+---
+
+## 27. Phase 27 — Multi-viewport Testing
+
+### P27-T01 — assay run --viewports mobile,tablet,desktop: run same test at multiple widths
 
 - **Status:** pending
 
-### P25-T02 — Viewport results in dashboard: side-by-side view per capture session
+### P27-T02 — Viewport results in dashboard: side-by-side view per capture session
 
 - **Status:** pending
 
-### P25-T03 — Viewport regression: diff per viewport independently, separate approve/reject
+### P27-T03 — Viewport regression: diff per viewport independently, separate approve/reject
 
 - **Status:** pending
 
 ---
 
-## 26. Phase 26 — Alerts + Webhooks
+## 28. Phase 28 — Alerts + Webhooks
 
-### P26-T01 — Webhook config: assay.toml [alerts] with URL + events (fail, regression, pass)
-
-- **Status:** pending
-
-### P26-T02 — Webhook delivery: POST JSON payload on triggered events
+### P28-T01 — Webhook config: assay.toml [alerts] with URL + events (fail, regression, pass)
 
 - **Status:** pending
 
-### P26-T03 — Slack integration: pre-built Slack webhook format with screenshot link
+### P28-T02 — Webhook delivery: POST JSON payload on triggered events
 
 - **Status:** pending
 
-### P26-T04 — Email alerts: SMTP config + HTML email on failure or regression
+### P28-T03 — Slack integration: pre-built Slack webhook format with screenshot link
+
+- **Status:** pending
+
+### P28-T04 — Email alerts: SMTP config + HTML email on failure or regression
 
 - **Status:** pending
 
 ---
 
-## 27. Phase 27 — Multi-user + Org Accounts
+## 29. Phase 29 — Multi-user + Org Accounts
 
-### P27-T01 — User registration + login: email/password accounts, JWT sessions
-
-- **Status:** pending
-
-### P27-T02 — Org model: users belong to an org, data isolated per org
+### P29-T01 — User registration + login: email/password accounts, JWT sessions
 
 - **Status:** pending
 
-### P27-T03 — Invite flow: invite teammates by email, accept via link
+### P29-T02 — Org model: users belong to an org, data isolated per org
 
 - **Status:** pending
 
-### P27-T04 — Per-key access scoping: restrict API keys to specific projects or users
+### P29-T03 — Invite flow: invite teammates by email, accept via link
 
 - **Status:** pending
 
-### P26-T05 — Billing hooks: usage tracking per org (prep for paid tiers)
+### P29-T04 — Per-key access scoping: restrict API keys to specific projects or users
+
+- **Status:** pending
+
+### P29-T05 — Billing hooks: usage tracking per org (prep for paid tiers)
 
 - **Status:** pending

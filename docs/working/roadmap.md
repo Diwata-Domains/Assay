@@ -11,6 +11,12 @@ Items here are not committed or scheduled. They become phases when current work 
 
 Features with clear demand or obvious next steps after the current phase sequence (22–26).
 
+**Security verification (pre-pentesting layer)**
+Once Phase 25 (functional + integration checks) is stable, extend the check engine with a dedicated security check type: verify that auth is enforced on all protected routes, that sensitive data isn't exposed in error responses, that security headers (CSP, HSTS, X-Content-Type-Options) are present, and that rate limiting is active. This is NOT active exploitation — it's verifying that the security posture is correctly configured. Prerequisite for any enterprise client delivery or SOC 2 preparation. Target: after Diwa Domains has paying customers and before any enterprise sales push.
+
+**Active penetration testing integration**
+Full exploit-attempt security testing — OWASP scanning, injection probes, auth bypass attempts. This is a separate specialized domain and would most likely be an integration with an existing engine (OWASP ZAP, Nuclei) rather than a built-from-scratch tool. Requires the security verification layer (above) to be stable first, and requires a clear operator consent model (active probing against production is destructive if misconfigured). Timing: post-Diwa Domains enterprise tier, or as a standalone "Probe" product under the Diwata toolkit.
+
 **Multi-browser support**
 Assay currently runs Chromium only via Playwright. Adding Firefox and WebKit would cover the full Playwright browser matrix. Requires updating the Docker runner and result packet to tag browser type. Natural extension after Phase 22 (script runner) and Phase 24 (multi-viewport) prove the multi-dimension test model.
 

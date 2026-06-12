@@ -7,6 +7,20 @@ project:
   storage: filesystem
   authority_model: explicit_hierarchy
 
+branch_policy:
+  mode: off
+  pattern: ""
+  enforce: false
+  enforce_after_days: 0
+  message: ""
+
+upgrade_policy:
+  min_version: "0.3.1"
+  min_version_set_at: "2026-06-12"
+  enforce: false
+  enforce_after_days: 0
+  message: ""
+
 canonical:
   - id: product_scope
     path: docs/canonical/product_scope.md
