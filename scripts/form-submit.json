@@ -1,0 +1,14 @@
+{
+  "name": "Form submit flow",
+  "steps": [
+    { "type": "navigate",   "url": "https://your-app.example.com/contact" },
+    { "type": "screenshot", "label": "form-empty" },
+    { "type": "fill",       "selector": "[name=name]",    "value": "Test User" },
+    { "type": "fill",       "selector": "[name=email]",   "value": "test@example.com" },
+    { "type": "fill",       "selector": "[name=message]", "value": "This is a test submission from Assay." },
+    { "type": "screenshot", "label": "form-filled" },
+    { "type": "click",      "selector": "[type=submit]" },
+    { "type": "wait_for",   "selector": ".success, .confirmation, [data-state=success]", "timeout": 6000 },
+    { "type": "screenshot", "label": "form-submitted" }
+  ]
+}

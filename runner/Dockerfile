@@ -11,6 +11,7 @@ COPY run.js ./
 RUN mkdir -p /output
 
 ENV ASSAY_TARGET_URL=""
+ENV ASSAY_SCRIPT_FILE=""
 ENV ASSAY_SUITE="default"
 ENV ASSAY_OUTPUT_DIR="/output"
 
