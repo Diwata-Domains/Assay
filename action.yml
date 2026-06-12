@@ -1,0 +1,176 @@
+name: 'Assay Verification'
+description: 'Run Assay visual regression and functional verification on a URL or multi-step script'
+author: 'Diwata Domains'
+
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  target:
+    description: 'URL to test (single-URL mode). Required if script is not set.'
+    required: false
+    default: ''
+  script:
+    description: 'Path to an Assay script JSON file (multi-step mode). Required if target is not set.'
+    required: false
+    default: ''
+  compare:
+    description: 'Compare screenshot against stored baseline for regression detection.'
+    required: false
+    default: 'false'
+  threshold:
+    description: 'Regression threshold as percent of changed pixels (default: 0.1).'
+    required: false
+    default: '0.1'
+  fail-on-regression:
+    description: 'Fail the workflow step if a visual regression is detected.'
+    required: false
+    default: 'true'
+  assay-version:
+    description: 'assay-kit version to install (default: latest).'
+    required: false
+    default: ''
+  python-version:
+    description: 'Python version to use.'
+    required: false
+    default: '3.12'
+  node-version:
+    description: 'Node.js version to use.'
+    required: false
+    default: '20'
+
+outputs:
+  outcome:
+    description: "'pass', 'fail', or 'regression'"
+    value: ${{ steps.run.outputs.outcome }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install assay-kit
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.assay-version }}" ]; then
+          pip install "assay-kit==${{ inputs.assay-version }}"
+        else
+          pip install assay-kit
+        fi
+
+    - name: Install Playwright browser
+      shell: bash
+      run: |
+        npm install playwright@1.44.0
+        npx playwright install chromium --with-deps
+
+    - name: Write assay.toml
+      shell: bash
+      run: |
+        mkdir -p .assay-ci
+        cat > assay.toml << 'TOML'
+        [project]
+        name = "ci"
+
+        [output]
+        directory = ".assay-ci/output"
+
+        [serve]
+        host = "0.0.0.0"
+        port = 8000
+
+        [keys]
+        store = "~/.assay/keys.json"
+
+        [store]
+        db = "~/.assay/store.db"
+
+        [schedule]
+        store = "~/.assay/schedules.json"
+
+        [ci]
+        compare = false
+        threshold = 0.1
+        fail_on_regression = true
+        comment = true
+        TOML
+
+    - name: Run Assay
+      id: run
+      shell: bash
+      run: |
+        set +e
+
+        COMPARE_FLAG=""
+        if [ "${{ inputs.compare }}" = "true" ]; then
+          COMPARE_FLAG="--compare --threshold ${{ inputs.threshold }}"
+        fi
+
+        if [ -n "${{ inputs.script }}" ]; then
+          assay run --script "${{ inputs.script }}" --output .assay-ci/output --no-docker
+        elif [ -n "${{ inputs.target }}" ]; then
+          assay run --target "${{ inputs.target }}" --output .assay-ci/output --no-docker $COMPARE_FLAG
+        else
+          echo "error: 'target' or 'script' input is required" >&2
+          exit 2
+        fi
+
+        EXIT=$?
+
+        if [ $EXIT -eq 0 ]; then
+          OUTCOME="pass"
+        elif [ $EXIT -eq 2 ]; then
+          OUTCOME="regression"
+        else
+          OUTCOME="fail"
+        fi
+
+        echo "outcome=$OUTCOME" >> $GITHUB_OUTPUT
+
+        if [ "$OUTCOME" = "regression" ] && [ "${{ inputs.fail-on-regression }}" = "false" ]; then
+          exit 0
+        fi
+        exit $EXIT
+
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: assay-results-${{ github.run_number }}
+        path: .assay-ci/output/
+        if-no-files-found: ignore
+
+    - name: Post PR comment
+      if: github.event_name == 'pull_request' && always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        OUTCOME="${{ steps.run.outputs.outcome }}"
+        TARGET="${{ inputs.script != '' && inputs.script || inputs.target }}"
+
+        case "$OUTCOME" in
+          pass)      ICON="✅" ;;
+          regression) ICON="⚠️" ;;
+          *)          ICON="❌" ;;
+        esac
+
+        BODY="${ICON} **Assay** — \`${OUTCOME}\`
+
+        **Target:** \`${TARGET}\`
+        **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+        Screenshots and packets uploaded as artifact \`assay-results-${{ github.run_number }}\`."
+
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --repo "${{ github.repository }}" \
+          --body "$BODY" 2>/dev/null || true

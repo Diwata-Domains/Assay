@@ -1,4 +1,4 @@
-"""Playwright Docker runner module.
+"""Playwright runner module — Docker and direct (no-Docker) modes.
 
 Starts an ephemeral Docker container from the Playwright runner image,
 passes the target URL and suite name as environment variables, mounts
@@ -8,10 +8,12 @@ captured output.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
+from pathlib import Path
 
 DEFAULT_IMAGE = "assay-playwright:latest"
 
@@ -87,6 +89,91 @@ def run(
 
     result = subprocess.run(
         cmd,
+        capture_output=True,
+        text=True,
+    )
+
+    return RunResult(
+        exit_code=result.returncode,
+        output_dir=output_dir,
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )
+
+
+def _find_runner_script() -> Path:
+    """Return path to the bundled Playwright runner script."""
+    bundled = Path(__file__).parent / "runner_script.js"
+    if bundled.exists():
+        return bundled
+    raise FileNotFoundError(
+        "runner_script.js not found in assay package. "
+        "Reinstall assay-kit or use Docker mode."
+    )
+
+
+def _node_env(output_dir: str) -> dict[str, str]:
+    """Build env dict for direct Node.js runner execution."""
+    env = dict(os.environ)
+    env["ASSAY_OUTPUT_DIR"] = output_dir
+    # Allow playwright installed in cwd node_modules to be found
+    cwd_modules = str(Path.cwd() / "node_modules")
+    existing = env.get("NODE_PATH", "")
+    env["NODE_PATH"] = f"{cwd_modules}:{existing}" if existing else cwd_modules
+    return env
+
+
+def run_direct(
+    target_url: str,
+    suite: str = "default",
+    output_dir: str | None = None,
+) -> RunResult:
+    """Run the Playwright runner directly via Node.js without Docker.
+
+    Requires Node.js and the playwright npm package to be installed.
+    playwright must be in NODE_PATH or ./node_modules (install with
+    `npm install playwright && npx playwright install chromium`).
+    """
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp(prefix="assay-")
+
+    runner_script = _find_runner_script()
+    env = _node_env(output_dir)
+    env["ASSAY_TARGET_URL"] = target_url
+    env["ASSAY_SUITE"] = suite
+
+    result = subprocess.run(
+        ["node", str(runner_script)],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    return RunResult(
+        exit_code=result.returncode,
+        output_dir=output_dir,
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )
+
+
+def run_script_direct(
+    script_path: Path,
+    suite: str = "default",
+    output_dir: str | None = None,
+) -> RunResult:
+    """Run a multi-step Assay script directly via Node.js without Docker."""
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp(prefix="assay-script-")
+
+    runner_script = _find_runner_script()
+    env = _node_env(output_dir)
+    env["ASSAY_SCRIPT_FILE"] = str(script_path.resolve())
+    env["ASSAY_SUITE"] = suite
+
+    result = subprocess.run(
+        ["node", str(runner_script)],
+        env=env,
         capture_output=True,
         text=True,
     )

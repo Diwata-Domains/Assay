@@ -15,7 +15,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain", "store"}
+_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain", "store", "ci"}
 
 
 class ConfigError(Exception):
@@ -66,6 +66,14 @@ class StoreConfig:
 
 
 @dataclass
+class CiConfig:
+    compare: bool = False
+    threshold: float = 0.1
+    fail_on_regression: bool = True
+    comment: bool = True
+
+
+@dataclass
 class AssayConfig:
     project: ProjectConfig = field(default_factory=ProjectConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
@@ -75,6 +83,7 @@ class AssayConfig:
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     grain: GrainConfig = field(default_factory=GrainConfig)
     store: StoreConfig = field(default_factory=StoreConfig)
+    ci: CiConfig = field(default_factory=CiConfig)
 
 
 def _resolve_path(override: str | None) -> Path | None:
@@ -111,6 +120,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     schedule = _section("schedule")
     grain = _section("grain")
     store = _section("store")
+    ci = _section("ci")
 
     raw_timeout = runner.get("timeout_seconds", 300)
     raw_port = serve.get("port", 8000)
@@ -137,6 +147,12 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
             output_path=str(grain.get("output_path", "")),
         ),
         store=StoreConfig(db=str(store.get("db", "~/.assay/store.db"))),
+        ci=CiConfig(
+            compare=bool(ci.get("compare", False)),
+            threshold=float(ci.get("threshold", 0.1)),
+            fail_on_regression=bool(ci.get("fail_on_regression", True)),
+            comment=bool(ci.get("comment", True)),
+        ),
     )
 
 
