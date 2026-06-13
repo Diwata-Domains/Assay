@@ -1,5 +1,5 @@
 # Current Task
 
-Task ID: —
-Task Path: —
-Status: idle (Phase 25 complete)
+Task ID: TASK-0071
+Task Path: tasks/P26-T01-TASK-0071/
+Status: in_progress
