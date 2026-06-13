@@ -394,6 +394,18 @@ def _do_compare(
     )
     if result.diff_pct > threshold:
         typer.echo(f"REGRESSION detected (>{threshold}%)", err=True)
+        if config.grain.auto_create:
+            from assay.grain.auto_task import create_regression_task
+            task_path = create_regression_task(
+                url=url,
+                diff_pct=result.diff_pct,
+                changed_pixels=result.changed_pixels,
+                total_pixels=result.total_pixels,
+                diff_image_path=str(result.diff_image_path) if result.diff_image_path else None,
+                config=config,
+            )
+            if task_path:
+                typer.echo(f"grain task: {task_path}")
         raise typer.Exit(1)
     else:
         typer.echo(f"clean — within threshold ({threshold}%)")
@@ -860,6 +872,22 @@ def check_cmd(
         for a in r.assertions:
             icon = "✓" if a.passed else "✗"
             typer.echo(f"  {icon} {a.name}: expected={a.expected!r} actual={a.actual!r}")
+        if not r.passed and config.grain.auto_create:
+            from assay.grain.auto_task import create_check_failure_task
+            failed_assertions: list[dict[str, object]] = [
+                {"name": a.name, "expected": a.expected, "actual": a.actual}
+                for a in r.assertions if not a.passed
+            ]
+            task_path = create_check_failure_task(
+                check_id=r.check_id,
+                check_type=r.check_type,
+                target=r.target,
+                failed_assertions=failed_assertions,
+                error=r.error,
+                config=config,
+            )
+            if task_path:
+                typer.echo(f"  grain task: {task_path}")
 
     raise typer.Exit(1 if any_failed else 0)
 
