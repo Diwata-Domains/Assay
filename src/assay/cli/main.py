@@ -151,7 +151,7 @@ def run(
         False, "--compare", help="Diff screenshot against stored baseline; exit 1 on regression."
     ),
     threshold: float = typer.Option(0.1, "--threshold", help="Regression threshold as % changed pixels (default 0.1)."),
-    no_docker: bool = typer.Option(False, "--no-docker", help="Run Playwright directly via Node.js (requires node + playwright installed)."),
+    no_docker: bool = typer.Option(False, "--no-docker", help="Run Playwright directly via Node.js (requires node + playwright installed)."),  # noqa: E501
 ) -> None:
     """Execute a test run using the Playwright + Docker runner.
 
@@ -280,8 +280,8 @@ def _run_script_mode(
     image = config.runner.docker_image
 
     from assay.grain.detect import detect_task_id
-    from assay.runner.artifacts import collect_artifacts
     from assay.runner import runner as _runner_mod
+    from assay.runner.artifacts import collect_artifacts
 
     effective_task_id = task_id or detect_task_id(config.grain.project_root or None)
 
@@ -763,6 +763,79 @@ def store_import(
 
     count = import_packets(packets, db_path)
     typer.echo(f"imported: {count} packet(s)")
+
+
+# ---------------------------------------------------------------------------
+# check
+# ---------------------------------------------------------------------------
+
+
+@app.command("check")
+def check_cmd(
+    ctx: typer.Context,
+    check_id: Optional[str] = typer.Option(None, "--check", help="Run a single check by ID."),  # noqa: UP007
+) -> None:
+    """Run named checks defined in [[checks]] in assay.toml."""
+    from assay.checks.models import CheckResult
+    from assay.checks.runner import UnknownCheckType, run_check
+    from assay.store.db import init_db, insert_check_result
+
+    config: AssayConfig = ctx.obj
+    checks = config.checks
+
+    if check_id is not None:
+        checks = [c for c in checks if c.id == check_id]
+        if not checks:
+            typer.echo(f"error: no check with id {check_id!r}", err=True)
+            raise typer.Exit(2)
+
+    if not checks:
+        typer.echo("no checks configured — add [[checks]] blocks to assay.toml")
+        raise typer.Exit(0)
+
+    db_path = __import__("pathlib").Path(config.store.db).expanduser()
+    init_db(db_path)
+
+    results: list[CheckResult] = []
+    for c in checks:
+        try:
+            result = run_check(c)
+        except UnknownCheckType as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(2) from exc
+        results.append(result)
+        insert_check_result(
+            {
+                "check_id": result.check_id,
+                "check_type": result.check_type,
+                "target": result.target,
+                "passed": result.passed,
+                "assertions": [
+                    {"name": a.name, "passed": a.passed, "expected": a.expected, "actual": a.actual}
+                    for a in result.assertions
+                ],
+                "error": result.error,
+                "checked_at": result.checked_at,
+            },
+            db_path,
+        )
+
+    col = "{:<24}  {:<10}  {:<44}  {}"
+    typer.echo(col.format("id", "type", "target", "status"))
+    typer.echo("-" * 96)
+    any_failed = False
+    for r in results:
+        status = "PASS" if r.passed else "FAIL"
+        if not r.passed:
+            any_failed = True
+        typer.echo(col.format(r.check_id[:24], r.check_type[:10], r.target[:44], status))
+        if r.error:
+            typer.echo(f"  error: {r.error}", err=True)
+        for a in r.assertions:
+            icon = "✓" if a.passed else "✗"
+            typer.echo(f"  {icon} {a.name}: expected={a.expected!r} actual={a.actual!r}")
+
+    raise typer.Exit(1 if any_failed else 0)
 
 
 # admin

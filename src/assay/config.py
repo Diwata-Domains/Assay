@@ -14,8 +14,9 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
-_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain", "store", "ci"}
+_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain", "store", "ci", "checks"}
 
 
 class ConfigError(Exception):
@@ -66,6 +67,23 @@ class StoreConfig:
 
 
 @dataclass
+class CheckConfig:
+    id: str
+    type: str
+    target: str
+    expect_status: int | None = None
+    max_response_ms: int | None = None
+    body_contains: str | None = None
+    body_json_path: str | None = None
+    body_json_value: str | None = None
+    expect_header: str | None = None
+    expect_absent: str | None = None
+    expect_value: str | None = None
+    api_key: str | None = None
+    timeout_seconds: int = 10
+
+
+@dataclass
 class CiConfig:
     compare: bool = False
     threshold: float = 0.1
@@ -84,6 +102,7 @@ class AssayConfig:
     grain: GrainConfig = field(default_factory=GrainConfig)
     store: StoreConfig = field(default_factory=StoreConfig)
     ci: CiConfig = field(default_factory=CiConfig)
+    checks: list[CheckConfig] = field(default_factory=list)
 
 
 def _resolve_path(override: str | None) -> Path | None:
@@ -122,6 +141,47 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     store = _section("store")
     ci = _section("ci")
 
+    raw_checks = raw.get("checks", [])
+    if not isinstance(raw_checks, list):
+        raise ConfigError("config section [checks] must be an array-of-tables")
+    parsed_checks: list[CheckConfig] = []
+    for i, item in enumerate(raw_checks):
+        if not isinstance(item, dict):
+            raise ConfigError(f"checks[{i}] must be a table")
+        check_id = item.get("id")
+        check_type = item.get("type")
+        check_target = item.get("target")
+        if not check_id or not isinstance(check_id, str):
+            raise ConfigError(f"checks[{i}] missing required field: id")
+        if not check_type or not isinstance(check_type, str):
+            raise ConfigError(f"checks[{i}] missing required field: type")
+        if not check_target or not isinstance(check_target, str):
+            raise ConfigError(f"checks[{i}] missing required field: target")
+        raw_timeout = item.get("timeout_seconds", 10)
+        if not isinstance(raw_timeout, int):
+            raise ConfigError(f"checks[{i}].timeout_seconds must be an integer")
+        raw_status = item.get("expect_status")
+        if raw_status is not None and not isinstance(raw_status, int):
+            raise ConfigError(f"checks[{i}].expect_status must be an integer")
+        raw_ms = item.get("max_response_ms")
+        if raw_ms is not None and not isinstance(raw_ms, int):
+            raise ConfigError(f"checks[{i}].max_response_ms must be an integer")
+        parsed_checks.append(CheckConfig(
+            id=check_id,
+            type=check_type,
+            target=check_target,
+            expect_status=raw_status,
+            max_response_ms=raw_ms,
+            body_contains=str(item["body_contains"]) if item.get("body_contains") is not None else None,
+            body_json_path=str(item["body_json_path"]) if item.get("body_json_path") is not None else None,
+            body_json_value=str(item["body_json_value"]) if item.get("body_json_value") is not None else None,
+            expect_header=str(item["expect_header"]) if item.get("expect_header") is not None else None,
+            expect_absent=str(item["expect_absent"]) if item.get("expect_absent") is not None else None,
+            expect_value=str(item["expect_value"]) if item.get("expect_value") is not None else None,
+            api_key=str(item["api_key"]) if item.get("api_key") is not None else None,
+            timeout_seconds=raw_timeout,
+        ))
+
     raw_timeout = runner.get("timeout_seconds", 300)
     raw_port = serve.get("port", 8000)
     if not isinstance(raw_timeout, int):
@@ -149,10 +209,11 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
         store=StoreConfig(db=str(store.get("db", "~/.assay/store.db"))),
         ci=CiConfig(
             compare=bool(ci.get("compare", False)),
-            threshold=float(ci.get("threshold", 0.1)),
+            threshold=float(cast(float, ci.get("threshold", 0.1))),
             fail_on_regression=bool(ci.get("fail_on_regression", True)),
             comment=bool(ci.get("comment", True)),
         ),
+        checks=parsed_checks,
     )
 
 

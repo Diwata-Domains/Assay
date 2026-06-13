@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from assay.runner.artifacts import ArtifactBundle, StepResult, collect_artifacts
+from assay.runner.artifacts import collect_artifacts
 from assay.runner.runner import RunResult
 
 
@@ -30,7 +30,7 @@ def test_collects_script_result(tmp_path):
         "error": None,
         "steps": [
             {"index": 0, "type": "navigate", "label": "navigate", "outcome": "pass", "error": None, "screenshot": None},
-            {"index": 1, "type": "screenshot", "label": "homepage", "outcome": "pass", "error": None, "screenshot": "step-1-homepage.png"},
+            {"index": 1, "type": "screenshot", "label": "homepage", "outcome": "pass", "error": None, "screenshot": "step-1-homepage.png"},  # noqa: E501
         ],
     })
     (tmp_path / "step-1-homepage.png").write_bytes(b"PNG")
@@ -48,7 +48,7 @@ def test_script_result_sets_first_screenshot_on_bundle(tmp_path):
         "outcome": "pass", "name": "t", "url": "", "suite": "default",
         "timestamp": "", "error": None,
         "steps": [
-            {"index": 0, "type": "screenshot", "label": "s1", "outcome": "pass", "error": None, "screenshot": "step-0-s1.png"},
+            {"index": 0, "type": "screenshot", "label": "s1", "outcome": "pass", "error": None, "screenshot": "step-0-s1.png"},  # noqa: E501
         ],
     })
     (tmp_path / "step-0-s1.png").write_bytes(b"PNG")
@@ -62,7 +62,7 @@ def test_script_result_fail_outcome(tmp_path):
         "outcome": "fail", "name": "t", "url": "", "suite": "default",
         "timestamp": "", "error": "selector not found",
         "steps": [
-            {"index": 0, "type": "click", "label": "click", "outcome": "fail", "error": "selector not found", "screenshot": None},
+            {"index": 0, "type": "click", "label": "click", "outcome": "fail", "error": "selector not found", "screenshot": None},  # noqa: E501
         ],
     })
     bundle = collect_artifacts(str(tmp_path), _run_result(exit_code=1))
@@ -86,7 +86,7 @@ def test_missing_screenshot_file_handled_gracefully(tmp_path):
         "outcome": "pass", "name": "t", "url": "", "suite": "default",
         "timestamp": "", "error": None,
         "steps": [
-            {"index": 0, "type": "screenshot", "label": "s", "outcome": "pass", "error": None, "screenshot": "missing.png"},
+            {"index": 0, "type": "screenshot", "label": "s", "outcome": "pass", "error": None, "screenshot": "missing.png"},  # noqa: E501
         ],
     })
     bundle = collect_artifacts(str(tmp_path), _run_result())
@@ -103,7 +103,7 @@ def test_format_packet_includes_steps(tmp_path):
         "suite": "default", "timestamp": "2026-06-12T00:00:00Z", "error": None,
         "steps": [
             {"index": 0, "type": "navigate", "label": "navigate", "outcome": "pass", "error": None, "screenshot": None},
-            {"index": 1, "type": "screenshot", "label": "home", "outcome": "pass", "error": None, "screenshot": "step-1-home.png"},
+            {"index": 1, "type": "screenshot", "label": "home", "outcome": "pass", "error": None, "screenshot": "step-1-home.png"},  # noqa: E501
         ],
     })
     (tmp_path / "step-1-home.png").write_bytes(b"PNG")
@@ -134,8 +134,8 @@ def test_step_screenshots_in_artifact_refs(tmp_path):
         "outcome": "pass", "name": "t", "url": "", "suite": "default",
         "timestamp": "", "error": None,
         "steps": [
-            {"index": 0, "type": "screenshot", "label": "a", "outcome": "pass", "error": None, "screenshot": "step-0-a.png"},
-            {"index": 1, "type": "screenshot", "label": "b", "outcome": "pass", "error": None, "screenshot": "step-1-b.png"},
+            {"index": 0, "type": "screenshot", "label": "a", "outcome": "pass", "error": None, "screenshot": "step-0-a.png"},  # noqa: E501
+            {"index": 1, "type": "screenshot", "label": "b", "outcome": "pass", "error": None, "screenshot": "step-1-b.png"},  # noqa: E501
         ],
     })
     (tmp_path / "step-0-a.png").write_bytes(b"PNG")

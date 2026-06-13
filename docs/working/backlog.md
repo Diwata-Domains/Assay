@@ -377,18 +377,13 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P25-T01 — `assay check` command + `[checks]` config block in assay.toml
 
-- **Status:** pending
-- `assay check` runs all named checks defined under `[checks]` in `assay.toml`
-- Each check has: `id`, `type` (http | header | auth | functional), `target` URL, and assertion fields
-- Results written to SQLite store and printed as pass/fail table
-- `--check <id>` flag to run a single named check
+- **Status:** done
+- **Task ID:** TASK-0066
 
 ### P25-T02 — HTTP assertion engine
 
-- **Status:** pending
-- Assert: status code, response time threshold, body contains string, body matches JSON path
-- Example: `GET /health` → expect `200`; `GET /brief` → expect body contains `"repos"`
-- Exit 1 if any assertion fails; structured result packet per check
+- **Status:** done
+- **Task ID:** TASK-0067
 
 ### P25-T03 — Header + security config checks
 

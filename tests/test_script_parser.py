@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from assay.scripts.parser import AssayScript, ScriptParseError, ScriptStep, parse_script
+from assay.scripts.parser import ScriptParseError, parse_script
 
 
 def _write(tmp_path: Path, data: object) -> Path:
