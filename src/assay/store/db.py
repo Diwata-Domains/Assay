@@ -33,6 +33,19 @@ CREATE TABLE IF NOT EXISTS baselines (
 )
 """
 
+_CREATE_CHECK_RESULTS = """
+CREATE TABLE IF NOT EXISTS check_results (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_id    TEXT NOT NULL,
+    check_type  TEXT NOT NULL,
+    target      TEXT NOT NULL,
+    passed      INTEGER NOT NULL,
+    assertions  TEXT NOT NULL DEFAULT '[]',
+    error       TEXT,
+    checked_at  TEXT NOT NULL
+)
+"""
+
 
 class StoreError(Exception):
     """Raised on unrecoverable store failures."""
@@ -52,6 +65,7 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
     with _connect(path) as conn:
         conn.execute(_CREATE_PACKETS)
         conn.execute(_CREATE_BASELINES)
+        conn.execute(_CREATE_CHECK_RESULTS)
         try:
             conn.execute("ALTER TABLE packets ADD COLUMN diff_result TEXT")
         except sqlite3.OperationalError:
@@ -196,6 +210,58 @@ def list_baselines(db_path: Optional[Path] = None) -> dict[str, str]:  # noqa: U
     except sqlite3.Error as exc:
         raise StoreError(f"list_baselines failed: {exc}") from exc
     return {row["url"]: row["verification_id"] for row in rows}
+
+
+def insert_check_result(result: dict[str, object], db_path: Optional[Path] = None) -> None:  # noqa: UP007
+    """Insert a check result dict into the check_results table."""
+    path = db_path or _DEFAULT_DB
+    try:
+        with _connect(path) as conn:
+            conn.execute(
+                """
+                INSERT INTO check_results
+                    (check_id, check_type, target, passed, assertions, error, checked_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(result.get("check_id", "")),
+                    str(result.get("check_type", "")),
+                    str(result.get("target", "")),
+                    1 if result.get("passed") else 0,
+                    json.dumps(result.get("assertions", [])),
+                    result.get("error"),
+                    str(result.get("checked_at", "")),
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"insert_check_result failed: {exc}") from exc
+
+
+def list_check_results(db_path: Optional[Path] = None) -> list[dict[str, object]]:  # noqa: UP007
+    """Return all check results ordered by checked_at ascending."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return []
+    try:
+        with _connect(path) as conn:
+            rows = conn.execute(
+                "SELECT check_id, check_type, target, passed, assertions, error, checked_at"
+                " FROM check_results ORDER BY checked_at ASC"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_check_results failed: {exc}") from exc
+    return [
+        {
+            "check_id": row["check_id"],
+            "check_type": row["check_type"],
+            "target": row["target"],
+            "passed": bool(row["passed"]),
+            "assertions": json.loads(row["assertions"]),
+            "error": row["error"],
+            "checked_at": row["checked_at"],
+        }
+        for row in rows
+    ]
 
 
 def set_review_status(

@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from assay.runner.runner import RunResult, _find_runner_script, run_direct, run_script_direct
+from assay.runner.runner import _find_runner_script, run_direct, run_script_direct
 
 
 def test_find_runner_script_exists():
@@ -81,7 +78,7 @@ def test_run_direct_sets_node_path(tmp_path):
 
 
 def test_run_direct_creates_output_dir_if_none():
-    with patch("subprocess.run", return_value=_mock_run(0)) as mock_sub:
+    with patch("subprocess.run", return_value=_mock_run(0)):
         with patch("tempfile.mkdtemp", return_value="/tmp/assay-test") as mock_tmp:
             run_direct("https://example.com")
 
