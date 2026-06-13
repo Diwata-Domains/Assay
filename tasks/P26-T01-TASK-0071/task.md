@@ -2,7 +2,7 @@
 
 ## Metadata
 - **ID:** TASK-0071
-- **Status:** in_progress
+- **Status:** done
 - **Phase:** Phase 26 — Auto Grain Task on Failure
 - **Backlog:** P26-T01
 - **Packet Path:** tasks/P26-T01-TASK-0071/

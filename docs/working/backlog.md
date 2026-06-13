@@ -412,35 +412,33 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P26-T01 — `[grain]` config section in assay.toml
 
-- **Status:** pending
-- Fields: `repo` (path to Grain repo root), `auto_create` (bool), `phase` (optional phase hint), `branch` (optional branch to write task on)
-- Extends the existing `[grain]` section from Phase 18
+- **Status:** done
+- **Task ID:** TASK-0071
+- Added `repo`, `auto_create`, `phase`, `branch` to `GrainConfig`; `auto_create` validates bool or "true"/"false" string
 
 ### P26-T02 — Auto-create Grain task on visual regression
 
-- **Status:** pending
-- When `assay run --compare` detects a regression: create a Grain task with diff image attached, URL, baseline vs current screenshot, timestamp
-- Task title: `Visual regression: <url> — <check_id or run_id>`
+- **Status:** done
+- **Task ID:** TASK-0072
+- `grain/auto_task.py` `create_regression_task()`; wired into `_do_compare` when `auto_create=True`
 
 ### P26-T03 — Auto-create Grain task on check failure
 
-- **Status:** pending
-- When `assay check` produces any failing result: create a Grain task per failing check
-- Task includes: check id, type, target URL, assertion that failed, actual vs expected value
-- Covers HTTP 500s, missing CORS headers, auth not enforced, console errors, functional assertion failures
+- **Status:** done
+- **Task ID:** TASK-0073
+- `create_check_failure_task()` wired into `check_cmd`; one task per failing check
 
 ### P26-T04 — Task deduplication
 
-- **Status:** pending
-- Before creating a task, check if an open Grain task already exists for the same check id + target
-- Skip creation if duplicate; log deduplication decision in check result
+- **Status:** done
+- **Task ID:** TASK-0074
+- `_is_duplicate()` scans `assay-*.json` in dest_dir; deduplicates on `issue_type+url` (regression) and `issue_type+check_id+target` (check)
 
 ### P26-T05 — Suggested remediation in task content
 
-- **Status:** pending
-- Each auto-created task includes a `remediation` field with a plain-language suggestion
-- Example: CORS failure → "Add `Access-Control-Allow-Origin: https://apex.diwata.domains` to the response headers"
-- Follows the same remediation pattern as `grain workflow guard`
+- **Status:** done
+- **Task ID:** TASK-0075
+- `suggest_remediation()` maps check_type+assertion_name to plain-language suggestions; `remediation` field in all auto-created packets
 
 ---
 
