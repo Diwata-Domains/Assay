@@ -507,6 +507,7 @@ def report(
     export: Optional[str] = typer.Option(  # noqa: UP007
         None, "--export", help="Write matching packets as JSON array to this file path."
     ),
+    checks: bool = typer.Option(False, "--checks", help="Include check results alongside packets."),
 ) -> None:
     """Display task packet summaries from the SQLite store."""
     import json as _json
@@ -517,6 +518,11 @@ def report(
     config: AssayConfig = ctx.obj
     db_path = _Path(config.store.db).expanduser()
     packets: list[dict[str, object]] = list_packets(db_path)
+
+    check_results: list[dict[str, object]] = []
+    if checks:
+        from assay.store.db import list_check_results
+        check_results = list_check_results(db_path)
 
     # Apply --filter key=value
     if filter:
@@ -534,7 +540,10 @@ def report(
         typer.echo("warning: --open is only supported with --format html")
 
     if format == "json":
-        typer.echo(_json.dumps(packets, indent=2))
+        if checks:
+            typer.echo(_json.dumps({"packets": packets, "checks": check_results}, indent=2))
+        else:
+            typer.echo(_json.dumps(packets, indent=2))
         raise typer.Exit(0)
 
     if format == "html":
@@ -551,23 +560,40 @@ def report(
             webbrowser.open(f"file://{resolved}")
         raise typer.Exit(0)
 
-    if not packets:
-        typer.echo("no packets found")
+    if not packets and not check_results:
+        typer.echo("no check results found" if checks else "no packets found")
         raise typer.Exit(0)
 
-    # Text table
-    col = "{:<36}  {:<13}  {:<8}  {:<10}  {:<10}  {}"
-    typer.echo(col.format("verification_id", "outcome", "severity", "screenshot", "verified_at", "summary"))
-    typer.echo("-" * 120)
-    for p in packets:
-        vid = str(p.get("verification_id", ""))[:36]
-        outcome = str(p.get("outcome", ""))
-        severity = str(p.get("severity", ""))
-        refs = cast(list[object], p.get("artifact_refs", []))
-        has_screenshot = "yes" if any(str(r).endswith(".png") for r in refs) else "no"
-        verified_at = str(p.get("verified_at", ""))[:10]
-        summary = str(p.get("summary", ""))
-        typer.echo(col.format(vid, outcome, severity, has_screenshot, verified_at, summary))
+    # Text table — packets
+    if packets:
+        col = "{:<36}  {:<13}  {:<8}  {:<10}  {:<10}  {}"
+        typer.echo(col.format("verification_id", "outcome", "severity", "screenshot", "verified_at", "summary"))
+        typer.echo("-" * 120)
+        for p in packets:
+            vid = str(p.get("verification_id", ""))[:36]
+            outcome = str(p.get("outcome", ""))
+            severity = str(p.get("severity", ""))
+            refs = cast(list[object], p.get("artifact_refs", []))
+            has_screenshot = "yes" if any(str(r).endswith(".png") for r in refs) else "no"
+            verified_at = str(p.get("verified_at", ""))[:10]
+            summary = str(p.get("summary", ""))
+            typer.echo(col.format(vid, outcome, severity, has_screenshot, verified_at, summary))
+
+    if checks and check_results:
+        typer.echo("\n-- check results --")
+        ccol = "{:<24}  {:<10}  {:<44}  {}"
+        typer.echo(ccol.format("check_id", "type", "target", "status"))
+        typer.echo("-" * 96)
+        for r in check_results:
+            status = "PASS" if r.get("passed") else "FAIL"
+            typer.echo(ccol.format(
+                str(r.get("check_id", ""))[:24],
+                str(r.get("check_type", ""))[:10],
+                str(r.get("target", ""))[:44],
+                status,
+            ))
+    elif checks:
+        typer.echo("\nno check results found")
 
 
 # ---------------------------------------------------------------------------
