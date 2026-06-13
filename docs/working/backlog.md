@@ -331,22 +331,22 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P23-T01 — Test script format: define steps (navigate, click, fill, screenshot) in a JS/TS file
 
-- **Status:** pending
+- **Status:** done
 - **Task ID:** TASK-0062
 
 ### P23-T02 — assay run --script <file>: execute script in Docker runner
 
-- **Status:** pending
+- **Status:** done
 - **Task ID:** TASK-0063
 
 ### P23-T03 — Script result packet: capture step-by-step screenshots + pass/fail per step
 
-- **Status:** pending
+- **Status:** done
 - **Task ID:** TASK-0064
 
 ### P23-T04 — Script library: built-in helpers (login flow, form fill, wait for selector)
 
-- **Status:** pending
+- **Status:** done
 - **Task ID:** TASK-0065
 
 ---
@@ -355,19 +355,19 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P24-T01 — GitHub Actions action (diwata/assay-action@v1): run assay on PR
 
-- **Status:** pending
+- **Status:** done
 
 ### P24-T02 — PR comment: post screenshot + diff summary as a PR comment
 
-- **Status:** pending
+- **Status:** done
 
 ### P24-T03 — Status check: fail PR check if regression detected, pass if clean
 
-- **Status:** pending
+- **Status:** done
 
 ### P24-T04 — assay ci config: assay.toml [ci] section for check behaviour and thresholds
 
-- **Status:** pending
+- **Status:** done
 
 ---
 
