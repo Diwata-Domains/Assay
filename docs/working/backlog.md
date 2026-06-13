@@ -387,10 +387,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P25-T03 — Header + security config checks
 
-- **Status:** pending
-- Assert header present/absent and value (e.g. `Access-Control-Allow-Origin`, `Content-Type`, `X-Frame-Options`)
-- Assert auth enforcement: protected route returns 401/403 without credentials, 200 with valid key
-- Covers the class of errors previously caught only by reading browser console (CORS missing, wrong content-type)
+- **Status:** done
+- **Task ID:** TASK-0068
 
 ### P25-T04 — Playwright functional assertions in scripts
 
