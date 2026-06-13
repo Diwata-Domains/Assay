@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from warden import WardenConfig, issue_token
 
-from assay.auth.admin import create_token, hash_password
+from assay.auth.admin import hash_password
 from assay.ingest.app import app as ingest_app
 from assay.keys.store import create_key
 from assay.store.db import init_db, insert_packet
@@ -33,14 +34,14 @@ _EMAIL = "admin@test.com"
 def _setup_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
     monkeypatch.setenv("ASSAY_ADMIN_PASSWORD_HASH", hash_password("pw"))
-    monkeypatch.setenv("ASSAY_JWT_SECRET", _SECRET)
+    monkeypatch.setenv("WARDEN_SECRET", _SECRET)
     db = tmp_path / "store.db"
     key_file = str(tmp_path / "keys.json")
     ingest_app.state.key_store = key_file
     ingest_app.state.output_dir = str(tmp_path)
     ingest_app.state.store_db = str(db)
     client = TestClient(ingest_app, follow_redirects=False)
-    client.cookies.set("assay_session", create_token(_EMAIL))
+    client.cookies.set("warden_session", issue_token(_EMAIL, WardenConfig(secret=_SECRET)))
     return client
 
 

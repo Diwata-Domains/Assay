@@ -16,18 +16,20 @@ _EMAIL = "admin@test.com"
 
 
 def _setup_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    from assay.auth.admin import create_token, hash_password
+    from warden import WardenConfig, issue_token
+
+    from assay.auth.admin import hash_password
 
     monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
     monkeypatch.setenv("ASSAY_ADMIN_PASSWORD_HASH", hash_password("pw"))
-    monkeypatch.setenv("ASSAY_JWT_SECRET", _SECRET)
+    monkeypatch.setenv("WARDEN_SECRET", _SECRET)
     db = tmp_path / "store.db"
     init_db(db)
     ingest_app.state.store_db = str(db)
     ingest_app.state.key_store = str(tmp_path / "keys.json")
     ingest_app.state.output_dir = str(tmp_path)
     client = TestClient(ingest_app, follow_redirects=False)
-    client.cookies.set("assay_session", create_token(_EMAIL))
+    client.cookies.set("warden_session", issue_token(_EMAIL, WardenConfig(secret=_SECRET)))
     return client
 
 

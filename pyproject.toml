@@ -25,6 +25,7 @@ dependencies = [
     "jsonschema>=4.23",
     "PyJWT>=2.8",
     "python-multipart>=0.0.9",
+    "warden>=0.1.0",
     "typer>=0.12",
     "uvicorn>=0.29",
 ]

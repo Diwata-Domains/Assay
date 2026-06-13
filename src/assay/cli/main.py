@@ -100,7 +100,7 @@ def init(
     typer.echo("Add these to your .env (do not commit this file):\n")
     typer.echo(f"ASSAY_ADMIN_EMAIL={admin_email}")
     typer.echo(f"ASSAY_ADMIN_PASSWORD_HASH={password_hash}")
-    typer.echo(f"ASSAY_JWT_SECRET={jwt_secret}")
+    typer.echo(f"WARDEN_SECRET={jwt_secret}")
     typer.echo("\nRun:  assay serve")
 
 
