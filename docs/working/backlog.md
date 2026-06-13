@@ -392,8 +392,8 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P25-T04 — Playwright functional assertions in scripts
 
-- **Status:** pending
-- Extend Phase 23 scripts with assertion steps: `expect(page).toHaveText()`, `toBeVisible()`, `toHaveURL()`, `not.toHaveText()`
+- **Status:** done
+- **Task ID:** TASK-0069
 - Console error detection: script fails if `console.error()` fires during page load or step execution
 - Step-level pass/fail in result packet
 

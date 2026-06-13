@@ -30,7 +30,10 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-VALID_STEP_TYPES = frozenset({"navigate", "click", "fill", "screenshot", "wait_for", "wait"})
+VALID_STEP_TYPES = frozenset({
+    "navigate", "click", "fill", "screenshot", "wait_for", "wait",
+    "expect_text", "expect_not_text", "expect_visible", "expect_url",
+})
 
 
 class ScriptParseError(Exception):
@@ -46,6 +49,8 @@ class ScriptStep:
     label: str = ""
     timeout: int = 5000
     ms: int = 1000
+    text: str = ""
+    pattern: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -56,6 +61,8 @@ class ScriptStep:
             "label": self.label,
             "timeout": self.timeout,
             "ms": self.ms,
+            "text": self.text,
+            "pattern": self.pattern,
         }
 
 
@@ -105,6 +112,15 @@ def parse_script(path: Path) -> AssayScript:
             raise ScriptParseError(f"step {i} (navigate): 'url' is required")
         if step_type in ("click", "fill", "wait_for") and not raw.get("selector"):
             raise ScriptParseError(f"step {i} ({step_type}): 'selector' is required")
+        if step_type in ("expect_text", "expect_not_text"):
+            if not raw.get("selector"):
+                raise ScriptParseError(f"step {i} ({step_type}): 'selector' is required")
+            if not raw.get("text") and raw.get("text") != "":
+                raise ScriptParseError(f"step {i} ({step_type}): 'text' is required")
+        if step_type == "expect_visible" and not raw.get("selector"):
+            raise ScriptParseError(f"step {i} (expect_visible): 'selector' is required")
+        if step_type == "expect_url" and not raw.get("pattern"):
+            raise ScriptParseError(f"step {i} (expect_url): 'pattern' is required")
 
         steps.append(ScriptStep(
             type=step_type,
@@ -114,6 +130,8 @@ def parse_script(path: Path) -> AssayScript:
             label=str(raw.get("label", step_type)),
             timeout=int(raw.get("timeout", 5000)),
             ms=int(raw.get("ms", 1000)),
+            text=str(raw.get("text", "")),
+            pattern=str(raw.get("pattern", "")),
         ))
 
     return AssayScript(name=name, steps=steps)

@@ -84,6 +84,9 @@ def format_packet(
                 "outcome": s.outcome,
                 "error": s.error,
                 "screenshot": s.screenshot_path,
+                **({
+                    "expected": s.expected, "actual": s.actual
+                } if s.expected is not None or s.actual is not None else {}),
             }
             for s in bundle.steps
         ]
