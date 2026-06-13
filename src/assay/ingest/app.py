@@ -6,7 +6,7 @@ import base64
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
 from warden import WardenConfig, WardenMiddleware, clear_session_cookie, issue_token, set_session_cookie
@@ -146,8 +146,9 @@ _LOGIN_STYLE = (
 )
 
 
-def _login_page(error: str = "") -> str:
+def _login_page(error: str = "", next_url: str = "") -> str:
     error_html = f'<p class="error">{error}</p>' if error else ""
+    next_field = f"<input type='hidden' name='next' value='{next_url}'>" if next_url else ""
     return (
         "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
         "<title>Assay — Login</title>"
@@ -155,6 +156,7 @@ def _login_page(error: str = "") -> str:
         "<div class='box'><h1>Assay</h1>"
         f"{error_html}"
         "<form method='post' action='/login'>"
+        f"{next_field}"
         "<label>Email</label><input type='email' name='email' required autofocus>"
         "<label>Password</label><input type='password' name='password' required>"
         "<button type='submit'>Sign in</button>"
@@ -163,14 +165,15 @@ def _login_page(error: str = "") -> str:
 
 
 @app.get("/login", response_class=HTMLResponse)
-async def login_page() -> HTMLResponse:
-    return HTMLResponse(_login_page())
+async def login_page(next: str = Query(default="")) -> HTMLResponse:
+    return HTMLResponse(_login_page(next_url=next))
 
 
 @app.post("/login", response_model=None)
 async def login_submit(
     email: str = Form(...),
     password: str = Form(...),
+    next: str = Form(default=""),
 ) -> HTMLResponse | RedirectResponse:
     from assay.auth.admin import (
         get_admin_email,
@@ -182,14 +185,16 @@ async def login_submit(
         admin_email = get_admin_email()
         admin_hash = get_admin_password_hash()
     except RuntimeError:
-        return HTMLResponse(_login_page("Server misconfigured — ASSAY_ADMIN_* env vars not set."), status_code=500)
+        msg = "Server misconfigured — ASSAY_ADMIN_* env vars not set."
+        return HTMLResponse(_login_page(msg, next_url=next), status_code=500)
 
     if email.strip().lower() != admin_email.lower() or not verify_password(password, admin_hash):
-        return HTMLResponse(_login_page("Invalid email or password."), status_code=401)
+        return HTMLResponse(_login_page("Invalid email or password.", next_url=next), status_code=401)
 
     cfg = WardenConfig.from_env()
     token = issue_token(email.strip().lower(), cfg)
-    response: RedirectResponse = RedirectResponse(url="/", status_code=303)
+    redirect_to = next.strip() or "/"
+    response: RedirectResponse = RedirectResponse(url=redirect_to, status_code=303)
     set_session_cookie(response, token, cfg)
     return response
 
