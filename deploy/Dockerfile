@@ -12,7 +12,7 @@ RUN mkdir -p /data/assay-output
 
 ENV ASSAY_ADMIN_EMAIL=""
 ENV ASSAY_ADMIN_PASSWORD_HASH=""
-ENV ASSAY_JWT_SECRET=""
+ENV WARDEN_SECRET=""
 
 COPY deploy/assay.container.toml /etc/assay/assay.toml
 
