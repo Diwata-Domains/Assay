@@ -6,60 +6,21 @@ import base64
 from pathlib import Path
 from typing import Any
 
-import jwt as _jwt
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from starlette.types import ASGIApp
+from warden import WardenConfig, WardenMiddleware, clear_session_cookie, issue_token, set_session_cookie
 
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
 from assay.keys.store import verify_key
 
-_PROTECTED_PREFIXES = ("/", "/packet/", "/keys")
-_PUBLIC_PATHS = {"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}
-_PUBLIC_PREFIXES = ("/status/",)
-
-
-class _AuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app_: ASGIApp) -> None:
-        super().__init__(app_)
-
-    async def dispatch(self, request: Request, call_next: Any) -> Response:
-        from typing import cast as _cast
-
-        path = request.url.path
-
-        if path in _PUBLIC_PATHS or request.method == "POST" and path in ("/login", "/ingest"):
-            return _cast(Response, await call_next(request))
-        if any(path.startswith(p) for p in _PUBLIC_PREFIXES):
-            return _cast(Response, await call_next(request))
-
-        is_protected = path == "/" or any(path.startswith(p) for p in ("/packet/", "/keys", "/checks"))
-        if not is_protected:
-            return _cast(Response, await call_next(request))
-
-        token = request.cookies.get("assay_session", "")
-        if not token:
-            return RedirectResponse(url="/login", status_code=303)
-
-        from assay.auth.admin import get_jwt_secret
-
-        try:
-            secret = get_jwt_secret()
-            _jwt.decode(token, secret, algorithms=["HS256"])
-        except Exception:
-            response = RedirectResponse(url="/login", status_code=303)
-            response.delete_cookie("assay_session")
-            return response
-
-        return _cast(Response, await call_next(request))
-
-
 app = FastAPI(title="Assay Ingest")
-app.add_middleware(_AuthMiddleware)
+app.add_middleware(
+    WardenMiddleware,
+    public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
+    public_prefixes=("/status/", "/mcp"),
+)
 
 # Overridable via app.state for tests
 app.state.key_store = "~/.assay/keys.json"
@@ -212,7 +173,6 @@ async def login_submit(
     password: str = Form(...),
 ) -> HTMLResponse | RedirectResponse:
     from assay.auth.admin import (
-        create_token,
         get_admin_email,
         get_admin_password_hash,
         verify_password,
@@ -227,16 +187,17 @@ async def login_submit(
     if email.strip().lower() != admin_email.lower() or not verify_password(password, admin_hash):
         return HTMLResponse(_login_page("Invalid email or password."), status_code=401)
 
-    token = create_token(email.strip().lower())
+    cfg = WardenConfig.from_env()
+    token = issue_token(email.strip().lower(), cfg)
     response: RedirectResponse = RedirectResponse(url="/", status_code=303)
-    response.set_cookie("assay_session", token, httponly=True, samesite="lax")
+    set_session_cookie(response, token, cfg)
     return response
 
 
 @app.get("/logout")
 async def logout() -> RedirectResponse:
     response: RedirectResponse = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie("assay_session")
+    clear_session_cookie(response, WardenConfig.from_env())
     return response
 
 

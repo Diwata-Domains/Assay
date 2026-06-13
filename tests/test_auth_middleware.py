@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from warden import WardenConfig, issue_token
 
-from assay.auth.admin import create_token, hash_password
+from assay.auth.admin import hash_password
 from assay.ingest.app import app
 
 _EMAIL = "admin@example.com"
@@ -15,13 +16,12 @@ _SECRET = "x" * 32
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
     monkeypatch.setenv("ASSAY_ADMIN_PASSWORD_HASH", hash_password(_PASSWORD))
-    monkeypatch.setenv("ASSAY_JWT_SECRET", _SECRET)
+    monkeypatch.setenv("WARDEN_SECRET", _SECRET)
     return TestClient(app, follow_redirects=False)
 
 
-def _session_cookie(monkeypatch: pytest.MonkeyPatch) -> str:
-    monkeypatch.setenv("ASSAY_JWT_SECRET", _SECRET)
-    return create_token(_EMAIL)
+def _session_cookie() -> str:
+    return issue_token(_EMAIL, WardenConfig(secret=_SECRET))
 
 
 def test_dashboard_redirects_without_session(client: TestClient) -> None:
@@ -58,16 +58,16 @@ def test_status_accessible_without_session(client: TestClient) -> None:
 
 
 def test_dashboard_accessible_with_valid_session(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
 ) -> None:
-    token = _session_cookie(monkeypatch)
-    client.cookies.set("assay_session", token)
+    token = _session_cookie()
+    client.cookies.set("warden_session", token)
     r = client.get("/")
     assert r.status_code == 200
 
 
 def test_invalid_token_redirects_to_login(client: TestClient) -> None:
-    client.cookies.set("assay_session", "not.a.valid.token")
+    client.cookies.set("warden_session", "not.a.valid.token")
     r = client.get("/")
     assert r.status_code == 303
     assert r.headers["location"] == "/login"

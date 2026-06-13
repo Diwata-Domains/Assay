@@ -15,7 +15,7 @@ _SECRET = "x" * 32
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
     monkeypatch.setenv("ASSAY_ADMIN_PASSWORD_HASH", hash_password(_PASSWORD))
-    monkeypatch.setenv("ASSAY_JWT_SECRET", _SECRET)
+    monkeypatch.setenv("WARDEN_SECRET", _SECRET)
     return TestClient(app, follow_redirects=False)
 
 
@@ -30,7 +30,7 @@ def test_login_success_redirects_to_dashboard(client: TestClient) -> None:
     r = client.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
     assert r.status_code == 303
     assert r.headers["location"] == "/"
-    assert "assay_session" in r.cookies
+    assert "warden_session" in r.cookies
 
 
 def test_login_sets_httponly_cookie(client: TestClient) -> None:
@@ -43,7 +43,7 @@ def test_login_wrong_password(client: TestClient) -> None:
     r = client.post("/login", data={"email": _EMAIL, "password": "wrongpassword"})
     assert r.status_code == 401
     assert "Invalid email or password" in r.text
-    assert "assay_session" not in r.cookies
+    assert "warden_session" not in r.cookies
 
 
 def test_login_wrong_email(client: TestClient) -> None:
@@ -54,8 +54,8 @@ def test_login_wrong_email(client: TestClient) -> None:
 
 def test_logout_clears_cookie(client: TestClient) -> None:
     login = client.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
-    session_cookie = login.cookies["assay_session"]
-    client.cookies.set("assay_session", session_cookie)
+    session_cookie = login.cookies["warden_session"]
+    client.cookies.set("warden_session", session_cookie)
     r = client.get("/logout")
     assert r.status_code == 303
     assert r.headers["location"] == "/login"
@@ -64,7 +64,7 @@ def test_logout_clears_cookie(client: TestClient) -> None:
 def test_login_missing_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ASSAY_ADMIN_EMAIL", raising=False)
     monkeypatch.delenv("ASSAY_ADMIN_PASSWORD_HASH", raising=False)
-    monkeypatch.delenv("ASSAY_JWT_SECRET", raising=False)
+    monkeypatch.delenv("WARDEN_SECRET", raising=False)
     c = TestClient(app, follow_redirects=False)
     r = c.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
     assert r.status_code == 500
