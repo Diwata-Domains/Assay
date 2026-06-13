@@ -399,10 +399,10 @@ Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ### P25-T05 — Check results in dashboard + report output
 
-- **Status:** pending
-- Dashboard shows check results in a dedicated tab: id, type, target, pass/fail, assertion detail, timestamp
-- `assay report` includes check results alongside visual packets
-- JSON output includes `checks` array with structured result per check
+- **Status:** done
+- **Task ID:** TASK-0070
+- `/checks` route in dashboard with table of check results; "Checks" link in nav
+- `assay report --checks` prints check table; `--format json --checks` wraps in `{"packets": [...], "checks": [...]}`
 
 ---
 

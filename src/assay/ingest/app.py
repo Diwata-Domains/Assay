@@ -37,7 +37,7 @@ class _AuthMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(p) for p in _PUBLIC_PREFIXES):
             return _cast(Response, await call_next(request))
 
-        is_protected = path == "/" or any(path.startswith(p) for p in ("/packet/", "/keys"))
+        is_protected = path == "/" or any(path.startswith(p) for p in ("/packet/", "/keys", "/checks"))
         if not is_protected:
             return _cast(Response, await call_next(request))
 
@@ -327,7 +327,79 @@ nav a{{margin-right:1.5rem}}
 {rows}
 </tbody>
 </table>
-<nav><a href="/keys">API Keys</a><a href="/logout">Sign out</a></nav>
+<nav><a href="/checks">Checks</a><a href="/keys">API Keys</a><a href="/logout">Sign out</a></nav>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
+@app.get("/checks", response_class=HTMLResponse)
+async def checks_dashboard(request: Request) -> HTMLResponse:
+    from assay.store.db import init_db as _init
+    from assay.store.db import list_check_results as _list_checks
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    _init(db_path)
+    results = _list_checks(db_path)
+
+    rows = ""
+    if not results:
+        rows = '<tr><td colspan="6" style="text-align:center">no checks run yet</td></tr>'
+    else:
+        for r in results:
+            status = "PASS" if r["passed"] else "FAIL"
+            status_class = "pass" if r["passed"] else "fail"
+            from typing import cast as _cast2
+            assertions = _cast2(list[dict[str, object]], r.get("assertions") or [])
+            failed = [a for a in assertions if not a.get("passed")]
+            detail = "; ".join(f"{a['name']}: {a['actual']}" for a in failed) if failed else (
+                "all pass" if assertions else "—"
+            )
+            ts = str(r.get("checked_at", ""))[:19]
+            rows += (
+                f"<tr>"
+                f'<td>{r["check_id"]}</td>'
+                f'<td>{r["check_type"]}</td>'
+                f'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">{r["target"]}</td>'
+                f'<td class="outcome-{status_class}">{status}</td>'
+                f"<td>{detail}</td>"
+                f"<td>{ts}</td>"
+                f"</tr>"
+            )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assay — Checks</title>
+<style>
+body{{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}}
+h1{{color:#fff;border-bottom:1px solid #333;padding-bottom:.5rem}}
+.outcome-pass{{color:#4caf50}}
+.outcome-fail{{color:#f44336}}
+table{{border-collapse:collapse;width:100%;margin-top:1rem}}
+th{{text-align:left;padding:.4rem .75rem;background:#1a1a1a;border-bottom:2px solid #333;font-size:.85rem}}
+td{{padding:.35rem .75rem;border-bottom:1px solid #1e1e1e;font-size:.85rem}}
+tr:hover td{{background:#141414}}
+a{{color:#90caf9;text-decoration:none}}
+a:hover{{text-decoration:underline}}
+nav{{margin-top:2rem;font-size:.85rem}}
+nav a{{margin-right:1.5rem}}
+</style>
+</head>
+<body>
+<h1>Assay — Check Results</h1>
+<table>
+<thead>
+<tr>
+<th>check_id</th><th>type</th><th>target</th><th>status</th><th>detail</th><th>checked_at</th>
+</tr>
+</thead>
+<tbody>
+{rows}
+</tbody>
+</table>
+<nav><a href="/">Packets</a><a href="/keys">API Keys</a><a href="/logout">Sign out</a></nav>
 </body>
 </html>"""
     return HTMLResponse(content=html)

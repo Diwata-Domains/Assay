@@ -2,7 +2,7 @@
 
 ## Metadata
 - **ID:** TASK-0070
-- **Status:** pending
+- **Status:** done
 - **Phase:** Phase 25 — Functional + Integration Checks
 - **Backlog:** P25-T05
 - **Packet Path:** tasks/P25-T05-TASK-0070/
