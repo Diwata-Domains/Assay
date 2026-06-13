@@ -28,6 +28,8 @@ class StepResult:
     outcome: str  # "pass" | "fail"
     error: Optional[str] = None  # noqa: UP007
     screenshot_path: Optional[str] = None  # full path on host
+    expected: Optional[str] = None  # assertion steps only  # noqa: UP007
+    actual: Optional[str] = None  # assertion steps only  # noqa: UP007
 
 
 @dataclass
@@ -125,6 +127,8 @@ def _collect_script_artifacts(
             outcome=str(s.get("outcome", "inconclusive")) if isinstance(s, dict) else "inconclusive",
             error=str(s["error"]) if isinstance(s, dict) and s.get("error") else None,
             screenshot_path=screenshot_path,
+            expected=str(s["expected"]) if isinstance(s, dict) and s.get("expected") is not None else None,
+            actual=str(s["actual"]) if isinstance(s, dict) and s.get("actual") is not None else None,
         ))
 
     return ArtifactBundle(

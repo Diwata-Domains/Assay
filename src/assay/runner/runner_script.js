@@ -101,6 +101,11 @@ async function runScript(scriptFilePath) {
     browser = await chromium.launch();
     const page = await browser.newPage();
 
+    const consoleErrors = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       const stepResult = {
@@ -111,6 +116,8 @@ async function runScript(scriptFilePath) {
         error: null,
         screenshot: null,
       };
+
+      const errorsBeforeStep = consoleErrors.length;
 
       try {
         switch (step.type) {
@@ -137,14 +144,70 @@ async function runScript(scriptFilePath) {
             stepResult.screenshot = filename;
             break;
           }
+          case 'expect_text': {
+            const actual = await page.textContent(step.selector) || '';
+            const expected = step.text || '';
+            stepResult.expected = expected;
+            stepResult.actual = actual;
+            if (!actual.includes(expected)) {
+              stepResult.outcome = 'fail';
+              stepResult.error = `Expected text "${expected}" not found in "${step.selector}"`;
+              overallOutcome = 'fail';
+            }
+            break;
+          }
+          case 'expect_not_text': {
+            const actual = await page.textContent(step.selector) || '';
+            const forbidden = step.text || '';
+            stepResult.expected = `not "${forbidden}"`;
+            stepResult.actual = actual;
+            if (actual.includes(forbidden)) {
+              stepResult.outcome = 'fail';
+              stepResult.error = `Text "${forbidden}" found in "${step.selector}" but expected absent`;
+              overallOutcome = 'fail';
+            }
+            break;
+          }
+          case 'expect_visible': {
+            const visible = await page.isVisible(step.selector);
+            stepResult.expected = 'visible';
+            stepResult.actual = visible ? 'visible' : 'not visible';
+            if (!visible) {
+              stepResult.outcome = 'fail';
+              stepResult.error = `Expected "${step.selector}" to be visible`;
+              overallOutcome = 'fail';
+            }
+            break;
+          }
+          case 'expect_url': {
+            const currentUrl = page.url();
+            const pattern = step.pattern || '';
+            stepResult.expected = `contains "${pattern}"`;
+            stepResult.actual = currentUrl;
+            if (!currentUrl.includes(pattern)) {
+              stepResult.outcome = 'fail';
+              stepResult.error = `Expected URL to contain "${pattern}", got "${currentUrl}"`;
+              overallOutcome = 'fail';
+            }
+            break;
+          }
           default:
             throw new Error(`Unknown step type: ${step.type}`);
         }
       } catch (err) {
+        if (stepResult.outcome !== 'fail') {
+          stepResult.outcome = 'fail';
+          stepResult.error = err.message;
+          overallOutcome = 'fail';
+        }
+      }
+
+      const errorsThisStep = consoleErrors.slice(errorsBeforeStep);
+      if (errorsThisStep.length > 0) {
         stepResult.outcome = 'fail';
-        stepResult.error = err.message;
+        const consoleMsg = `console.error: ${errorsThisStep.join('; ')}`;
+        stepResult.error = stepResult.error ? `${stepResult.error}; ${consoleMsg}` : consoleMsg;
         overallOutcome = 'fail';
-        // Continue collecting evidence from remaining steps
       }
 
       stepResults.push(stepResult);
