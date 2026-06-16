@@ -175,6 +175,61 @@ All v0.3.0 features are implemented across Phases 17–26. The release tag has n
 
 ---
 
+### Phase 30 — Error Visibility + Screenshot Serving
+
+> **Status:** planned.
+
+### P30-T01 — Dashboard error panel
+- **Status:** pending
+- **Description:** Filter packets by `outcome=fail`. Show error message and stack trace inline on the packet detail view. Add a dedicated `/errors` tab in the dashboard nav.
+- **Files:** dashboard routes, templates
+
+### P30-T02 — `assay logs` CLI command
+- **Status:** pending
+- **Description:** `assay logs` tails `~/.assay/scheduler.log` and the ingest server log. `--lines N` for history, `--follow` for live tail.
+- **Files:** `src/assay/cli/logs.py` (new), `src/assay/cli/main.py`
+
+### P30-T03 — `/screenshots/{id}` serving endpoint
+- **Status:** pending
+- **Description:** `assay serve` exposes a static route for screenshot artifacts by packet ID. Returns the image with correct content-type. Enables stable shareable URLs for use in CI comments and Slack messages.
+- **Files:** `src/assay/server/routes.py`
+
+### P30-T04 — `/errors` JSON endpoint
+- **Status:** pending
+- **Description:** `GET /errors` returns recent failed packets as structured JSON (id, project, outcome, error, timestamp). Useful for CI integrations and external dashboards. Protected by admin JWT.
+- **Files:** `src/assay/server/routes.py`
+
+---
+
+### Phase 31 — Client Access Layer
+
+> **Status:** planned.
+
+### P31-T01 — `POST /admin/keys` programmatic key creation
+- **Status:** pending
+- **Description:** Admin API endpoint to create a new API key for a named project. Protected by admin JWT. Returns the key once — same semantics as `assay key create`. Eliminates the need to SSH in and run the CLI for each client.
+- **Files:** `src/assay/server/routes.py`, `src/assay/auth/keys.py`
+
+### P31-T02 — Project entity on API keys
+- **Status:** pending
+- **Description:** Add a `project` field to the API key record. Ingest endpoint associates each packet with the key's project. Existing keyless behaviour unchanged.
+- **Files:** `src/assay/auth/keys.py`, `src/assay/schemas/`, SQLite migration
+- **Dependencies:** P31-T01
+
+### P31-T03 — Dashboard project filter
+- **Status:** pending
+- **Description:** Dashboard filters packets to the authenticated key's project. Admin JWT sees all projects. Project key sees only its own data.
+- **Files:** dashboard routes, templates, `src/assay/server/routes.py`
+- **Dependencies:** P31-T02
+
+### P31-T04 — Read-only viewer login
+- **Status:** pending
+- **Description:** A client authenticates via their project API key on a `/login` page and receives a short-lived read-only JWT scoped to their project. They can browse their project dashboard without access to admin functions or other projects.
+- **Files:** `src/assay/auth/viewer.py` (new), dashboard login template
+- **Dependencies:** P31-T03
+
+---
+
 ## Backlog Maintenance Rules
 
 1. Backlog items must remain concrete and implementable
