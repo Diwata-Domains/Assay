@@ -1,505 +1,182 @@
 # Backlog
 
 **Project:** Assay
-**Last updated:** 2026-04-21
 
 Status values: `pending` | `ready` | `in_progress` | `blocked` | `done`
 
 ---
 
-## Phase 1 — Foundation ✓ CLOSED (5 tasks — archived to tasks/archive/phase-1/)
+## v0.1.0 — Foundation and Core Pipeline ✓ RELEASED
 
-## Phase 2 — CLI Skeleton ✓ CLOSED (5 tasks — archived to tasks/archive/phase-2/)
+## Phase 1 — Foundation ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-1/`
 
-## Phase 3 — Playwright + Docker Runner ✓ CLOSED (5 tasks — archived to tasks/archive/phase-3/)
+## Phase 2 — CLI Skeleton ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-2/`
 
-## Phase 4 — Task Packet Formatter ✓ CLOSED (5 tasks — archived to tasks/archive/phase-4/)
+## Phase 3 — Playwright + Docker Runner ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-3/`
 
-## Phase 5 — FastAPI Ingest Layer + Auth ✓ CLOSED (6 tasks — archived to tasks/archive/phase-5/)
+## Phase 4 — Task Packet Formatter ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-4/`
 
----
+## Phase 5 — FastAPI Ingest Layer + Auth ✓ CLOSED
+6 tasks done — archived to `tasks/archive/phase-5/`
 
-## Phase 6 — TypeScript Browser SDK ✓ CLOSED (6 tasks — archived to tasks/archive/phase-6/)
+## Phase 6 — TypeScript Browser SDK ✓ CLOSED
+6 tasks done — archived to `tasks/archive/phase-6/`
 
----
+## Phase 7 — Scheduler ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-7/`
+Key deliverables: `assay schedule add/list/remove`, cron integration (APScheduler), scheduler loop.
 
-## Phase 7 — Scheduler ✓ CLOSED (5 tasks)
+## Phase 8 — Integration + E2E Testing ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-8/`
+Key deliverables: E2E coverage for `assay run`, SDK capture → ingest, auth rejection, config precedence.
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P7-T01 | Implement schedule state persistence (`~/.assay/schedules.json`) | done | P1-T04 | 15 tests |
-| P7-T02 | Implement `assay schedule add/list/remove` fully | done | P7-T01, P2-T03 | 12 tests; ScheduleConfig added to config |
-| P7-T03 | Integrate cron expression parser (APScheduler) | done | P7-T01 | implemented in P7-T02; cron.py |
-| P7-T04 | Implement scheduler loop (invoke runner at scheduled times) | done | P7-T02, P7-T03, P3-T04 | 8 tests; CP-003 filed |
-| P7-T05 | Scheduler integration test | done | P7-T04 | 5 tests |
-
----
-
-## Phase 8 — Integration + E2E Testing ✓ CLOSED (5 tasks)
-
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P8-T01 | E2E: `assay run` → subprocess mock → schema-valid packet | done | P4-T05, P3-T05 | 5 tests |
-| P8-T02 | E2E: SDK capture → ingest → schema-valid packet | done | P6-T06 | 7 tests |
-| P8-T03 | Auth rejection E2E | done | P5-T06 | covered in P8-T02 (test_e2e_sdk.py) |
-| P8-T04 | Config precedence tests | done | P2-T05 | 10 tests |
-| P8-T05 | Cross-phase regression sweep | done | all phases | 209 pytest passing |
+## Phase 9 — Packaging + Distribution ✓ CLOSED
+4 tasks done — archived to `tasks/archive/phase-9/`
+Key deliverables: PyPI metadata finalized, npm metadata finalized, Docker runner documented, first-run guide.
 
 ---
 
-## Phase 9 — Packaging + Distribution ✓ CLOSED (4 tasks)
+## v0.2.0 — Developer Experience ✓ RELEASED
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P9-T01 | Finalize Python package metadata | done | P8 complete | pyproject.toml: readme, license, authors, classifiers; README.md |
-| P9-T02 | Finalize npm package metadata | done | P8 complete | package.json: author, license, keywords |
-| P9-T03 | Document Docker runner image | done | P8 complete | Build instructions in README.md |
-| P9-T04 | First-run installation guide | done | P9-T01–P9-T03 | README.md: requirements, quick start, SDK, dev setup |
+## Phase 10 — Distribution + CI ✓ CLOSED
+2 tasks done — archived to `tasks/archive/phase-10/`
+Key deliverables: PyPI publish workflow, GitHub Actions CI (pytest + ruff + mypy + vitest).
 
----
+## Phase 11 — Screenshot Persistence + `assay report` ✓ CLOSED
+3 tasks done — archived to `tasks/archive/phase-11/`
+Key deliverables: SDK screenshots saved to disk on ingest, `assay report` (table + json + filter).
 
-## v0.2.0
+## Phase 12 — Grain Task Tagging + `assay submit` ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-12/`
+Key deliverables: `assay run --task-id`, Grain auto-detection, `assay submit --packet`, SDK taskId passthrough.
 
----
+## Phase 13 — Background Scheduler (Daemon Mode) ✓ CLOSED
+4 tasks done — archived to `tasks/archive/phase-13/`
+Key deliverables: `assay schedule start/stop/status`, PID file locking, log file at `~/.assay/scheduler.log`.
 
-## Phase 10 — Distribution + CI ✓ CLOSED (2 tasks)
+## Phase 14 — HTML Report ✓ CLOSED
+2 tasks done — archived to `tasks/archive/phase-14/`
+Key deliverables: `assay report --format html` (single-file with inline screenshots), `--open` flag.
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P10-T01 | PyPI publish workflow (GitHub Actions release job) | done | P9 complete | `.github/workflows/release.yml`; pypa/gh-action-pypi-publish |
-| P10-T02 | GitHub Actions CI: pytest + ruff + mypy + vitest | done | P9 complete | `.github/workflows/ci.yml`; matrix Python 3.11/3.12 |
+## Phase 15 — Watch Mode ✓ CLOSED
+2 tasks done — archived to `tasks/archive/phase-15/`
+Key deliverables: `assay run --watch`, `--watch-path` glob option.
 
----
+## Phase 16 — SQLite Output Store ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-16/`
+Key deliverables: SQLite schema, packets written on run and ingest, `assay report` reads from SQLite, `assay store import`.
 
-## Phase 11 — Screenshot Persistence + `assay report` ✓ CLOSED (3 tasks)
+## Phase 17 — Web UI / Dashboard ✓ CLOSED
+3 tasks done — archived to `tasks/archive/phase-17/`
+Key deliverables: dashboard at `/`, packet list view, packet detail view with inline screenshot.
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P11-T01 | Save SDK screenshot to disk on ingest; populate artifact_refs | done | P5 complete | `{verification_id}.png` in output dir; 4 tests |
-| P11-T02 | Verify runner screenshot is copied + referenced in artifact_refs | done | P3-T05 | Copies to `{verification_id}.png` in output dir; 2 tests |
-| P11-T03 | Implement `assay report` command (table + json + filter) | done | P4 complete | --format json, --filter key=val; 10 tests |
+## Phase 18 — Diff Engine + Visual Regression ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-18/`
+Key deliverables: pixel-level diff engine, before/after overlay slider in dashboard, regression detection.
 
----
+## Phase 19 — Baseline Management ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-19/`
+Key deliverables: per-check approve/reject on baseline updates, baseline stored as separate artifact.
 
-## Phase 12 — Grain Task Tagging + `assay submit` ✓ CLOSED (5 tasks)
+## Phase 20 — CI Integration + GitHub Action ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-20/`
+Key deliverables: `action.yml` GitHub Action, non-zero exit on regression, commit status posting.
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P12-T01 | `assay run --task-id` flag; populate task_id in packet | done | P4 complete | 3 tests |
-| P12-T02 | Grain auto-detection: read current_task.md / GRAIN_TASK_ID env | done | P12-T01 | detect_task_id(); 5 tests |
-| P12-T03 | `assay submit --packet <path>` command + [grain] config section | done | P12-T01 | schema-validates before copy; 3 tests |
-| P12-T04 | `assay run --submit` one-step flag | done | P12-T03 | 1 test |
-| P12-T05 | SDK taskId passthrough to ingest payload | done | P6 complete | Optional task_id field in IngestPayload; 2 tests |
+## Phase 21 — Check Library ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-21/`
+Key deliverables: HTTP checks (status code, response time, redirect chain), header checks (CSP, X-Frame-Options), auth checks.
 
----
+## Phase 22 — `assay init` ✓ CLOSED
+4 tasks done — archived to `tasks/archive/phase-22/`
+Key deliverables: interactive first-run wizard, `AssaySDK.fromEnv()`, `useAssayCapture()` React hook.
 
-## Phase 13 — Background Scheduler (Daemon Mode) ✓ CLOSED (4 tasks)
+## Phase 23 — Grain Integration ✓ CLOSED
+4 tasks done — archived to `tasks/archive/phase-23/`
+Key deliverables: `grain verify` bridge, Grain auto-task creation from Assay results.
 
-| ID | Task | Status | Dependencies | Notes |
-|----|------|--------|--------------|-------|
-| P13-T01 | `assay schedule start`: background process + PID file | done | P7 complete | os.fork(); double-start prevention |
-| P13-T02 | `assay schedule stop`: SIGTERM + PID cleanup | done | P13-T01 | stale PID detection |
-| P13-T03 | `assay schedule status`: running/stopped + log file | done | P13-T01 | 11 tests total |
-| P13-T04 | PID file locking; log file at ~/.assay/scheduler.log | done | P13-T01 | log redirect on daemon start |
+## Phase 24 — Error Recovery ✓ CLOSED
+Archived to `tasks/archive/phase-24/`
+Key deliverables: runner error handling, retry logic, structured error output in packets.
 
----
+## Phase 25 — Script DSL ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-25/`
+Key deliverables: JSON script format (navigate, fill, click, wait, capture), script validation, `assay run --script`.
 
-## v0.2.0
+## Phase 26 — Self-check + Remediation ✓ CLOSED
+5 tasks done — archived to `tasks/archive/phase-26/`
+Key deliverables: `assay check` built-in verification suite, `suggest_remediation()`, remediation field in auto-created packets.
 
----
-
-## 14. Phase 14 — HTML Report
-
-### P14-T01 — assay report --format html: single-file HTML with inline screenshots
-
-- **Status:** done
-- **Task ID:** TASK-0032
-
-### P14-T02 — assay report --format html --open: auto-open in default browser
-
-- **Status:** done
-- **Task ID:** TASK-0033
-
----
-
-## 15. Phase 15 — Watch Mode
-
-### P15-T01 — assay run --watch: re-run on file/path change
-
-- **Status:** done
-- **Task ID:** TASK-0034
-
-### P15-T02 — --watch-path glob option for file-based trigger
-
-- **Status:** done
-- **Task ID:** TASK-0035
+## Phase 27 — Multi-viewport Testing ✓ CLOSED
+1 task done — archived to `tasks/archive/phase-27/`
 
 ---
 
-## 16. Phase 16 — SQLite Output Store
+## v0.3.0 — Visual Verification (implemented, pending release)
 
-### P16-T01 — SQLite schema and assay store module
-
-- **Status:** done
-- **Task ID:** TASK-0036
-
-### P16-T02 — Write packets to SQLite on assay run and /ingest
-
-- **Status:** done
-- **Task ID:** TASK-0037
-
-### P16-T03 — assay report reads from SQLite with filter and format preserved
-
-- **Status:** done
-- **Task ID:** TASK-0038
-
-### P16-T04 — assay report --export json: backwards-compatible dump
-
-- **Status:** done
-- **Task ID:** TASK-0039
-
-### P16-T05 — assay store import --dir: import existing assay JSON files
-
-- **Status:** done
-- **Task ID:** TASK-0040
+All v0.3.0 features are implemented across Phases 17–26. The release tag has not been cut yet.
 
 ---
 
-## v0.3.0
+## v0.4.0 — Multi-viewport and Alerts
 
----
+### Phase 28 — Multi-viewport Testing
 
-## 17. Phase 17 — Web UI / Dashboard
+> **Status:** planned — first v0.4.0 feature phase.
 
-### P17-T01 — Dashboard route at `/` served by assay serve
-
-- **Status:** done
-- **Task ID:** TASK-0041
-
-### P17-T02 — Packet list view: table with outcome, severity, screenshot, timestamp
-
-- **Status:** done
-- **Task ID:** TASK-0042
-
-### P17-T03 — Packet detail view: full fields + inline screenshot
-
-- **Status:** done
-- **Task ID:** TASK-0043
-
----
-
-## 18. Phase 18 — Grain Integration Loop Closure
-
-### P18-T01 — Document canonical Grain-Assay handshake
-
-- **Status:** done
-- **Task ID:** TASK-0044
-
-### P18-T02 — verification_id idempotency for resubmits
-
-- **Status:** done
-- **Task ID:** TASK-0045
-
-### P18-T03 — GET /status/{verification_id} endpoint
-
-- **Status:** done
-- **Task ID:** TASK-0046
-
-### P18-T04 — Harden assay submit and --submit flows
-
-- **Status:** done
-- **Task ID:** TASK-0047
-
-### P18-T05 — End-to-end integration tests for verify flow
-
-- **Status:** done
-- **Task ID:** TASK-0048
-
----
-
-## 19. Phase 19 — Screenshot Quality + Docker Runner Validation
-
-### P19-T01 — Replace html2canvas with html-to-image in the browser SDK
-
-- **Status:** done
-- **Task ID:** TASK-0049
-
-### P19-T02 — Smoke-test the Docker runner build and run end-to-end
-
-- **Status:** done
-- **Task ID:** TASK-0050
-
-### P19-T03 — SDK taskId and verificationId passthrough
-
-- **Status:** done
-- **Task ID:** TASK-0051
-
----
-
-## 20. Phase 20 — Hosted Dashboard
-
-### P20-T01 — Admin credentials config (env vars + assay admin set-password)
-
-- **Status:** done
-- **Task ID:** TASK-0052
-
-### P20-T02 — Login page + JWT cookie session (GET /login, POST /login, GET /logout)
-
-- **Status:** done
-- **Task ID:** TASK-0053
-
-### P20-T03 — Auth middleware protecting dashboard routes
-
-- **Status:** done
-- **Task ID:** TASK-0054
-
-### P20-T04 — Key management UI (list, create, revoke from browser)
-
-- **Status:** done
-- **Task ID:** TASK-0055
-
-### P20-T05 — Deployment config (Dockerfile, docker-compose, nginx, .env.example)
-
-- **Status:** done
-- **Task ID:** TASK-0056
-
----
-
-## 21. Phase 21 — Visual Regression Testing
-
-### P21-T01 — Baseline capture: mark a packet as the approved baseline for a URL
-
-- **Status:** done
-- **Task ID:** TASK-0057
-
-### P21-T02 — Pixel diff engine: compare new capture against baseline, generate diff image
-
-- **Status:** done
-- **Task ID:** TASK-0058
-
-### P21-T03 — Diff view in dashboard: before/after slider + highlighted regions
-
-- **Status:** done
-- **Task ID:** TASK-0059
-
-### P21-T04 — Approve/reject workflow: accept new baseline or flag as regression
-
-- **Status:** done
-- **Task ID:** TASK-0060
-
-### P21-T05 — assay run --compare: diff against baseline from CLI, exit 1 on regression
-
-- **Status:** done
-- **Task ID:** TASK-0061
-
----
-
-## 22. Phase 22 — Developer Experience + SDK Integration
-
-**Goal:** Remove the friction from first-time setup, API key creation, and SDK integration in app projects. The current flow requires knowing about assay.toml, generating bcrypt hashes manually, and wiring up the SDK without obvious guidance. This phase makes the full setup a guided 2-minute flow.
-
-### P22-T01 — `assay init`: interactive first-run setup wizard
-
-- **Status:** done
-- Prompts for output dir, admin email, admin password (hashes inline), ingest port
-- Writes `assay.toml` and prints `.env` block ready to paste
-- Idempotent — safe to re-run; won't overwrite existing config without confirmation
-
-### P22-T02 — `assay key create` UX: print curl example + SDK snippet with new key
-
-- **Status:** done
-- After printing the raw key, print a ready-to-use curl example and SDK constructor snippet
-- Makes the key immediately usable without hunting docs
-
-### P22-T03 — SDK: `AssaySDK.fromEnv()` factory + cleaner integration for app projects
-
-- **Status:** done
-- Add static `fromEnv()` that reads `ASSAY_ENDPOINT` and `ASSAY_API_KEY` env vars
-- Add `useAssayCapture()` React hook in a new `@diwata-labs/assay-sdk/react` export
-- Keep the existing constructor — `fromEnv()` is additive
-
-### P22-T04 — SDK setup guide: framework-specific integration examples
-
-- **Status:** done
-- Vite/React quickstart: env vars, hook usage, capture on button press
-- Next.js quickstart: server-side key, client-side capture component
-- Lives in `packages/assay-sdk/docs/`
-
----
-
-## 23. Phase 23 — Multi-step Playwright Test Scripts
-
-### P23-T01 — Test script format: define steps (navigate, click, fill, screenshot) in a JS/TS file
-
-- **Status:** done
-- **Task ID:** TASK-0062
-
-### P23-T02 — assay run --script <file>: execute script in Docker runner
-
-- **Status:** done
-- **Task ID:** TASK-0063
-
-### P23-T03 — Script result packet: capture step-by-step screenshots + pass/fail per step
-
-- **Status:** done
-- **Task ID:** TASK-0064
-
-### P23-T04 — Script library: built-in helpers (login flow, form fill, wait for selector)
-
-- **Status:** done
-- **Task ID:** TASK-0065
-
----
-
-## 24. Phase 24 — CI/CD Integration
-
-### P24-T01 — GitHub Actions action (diwata/assay-action@v1): run assay on PR
-
-- **Status:** done
-
-### P24-T02 — PR comment: post screenshot + diff summary as a PR comment
-
-- **Status:** done
-
-### P24-T03 — Status check: fail PR check if regression detected, pass if clean
-
-- **Status:** done
-
-### P24-T04 — assay ci config: assay.toml [ci] section for check behaviour and thresholds
-
-- **Status:** done
-
----
-
-## 25. Phase 25 — Functional + Integration Checks
-
-**Goal:** Elevate Assay from a screenshot tool into a genuine verifier. Operators define named checks in `assay.toml` — HTTP assertions, header/CORS checks, auth enforcement, Playwright functional assertions, and JS console error detection. Failures produce structured results alongside visual packets.
-
-### P25-T01 — `assay check` command + `[checks]` config block in assay.toml
-
-- **Status:** done
-- **Task ID:** TASK-0066
-
-### P25-T02 — HTTP assertion engine
-
-- **Status:** done
-- **Task ID:** TASK-0067
-
-### P25-T03 — Header + security config checks
-
-- **Status:** done
-- **Task ID:** TASK-0068
-
-### P25-T04 — Playwright functional assertions in scripts
-
-- **Status:** done
-- **Task ID:** TASK-0069
-- Console error detection: script fails if `console.error()` fires during page load or step execution
-- Step-level pass/fail in result packet
-
-### P25-T05 — Check results in dashboard + report output
-
-- **Status:** done
-- **Task ID:** TASK-0070
-- `/checks` route in dashboard with table of check results; "Checks" link in nav
-- `assay report --checks` prints check table; `--format json --checks` wraps in `{"packets": [...], "checks": [...]}`
-
----
-
-## 26. Phase 26 — Auto Grain Task on Failure
-
-**Goal:** Close the Grain ↔ Assay loop automatically. When a run detects a regression or a check fails, Assay creates a Grain task in the configured repo — no manual `assay submit` step required.
-
-### P26-T01 — `[grain]` config section in assay.toml
-
-- **Status:** done
-- **Task ID:** TASK-0071
-- Added `repo`, `auto_create`, `phase`, `branch` to `GrainConfig`; `auto_create` validates bool or "true"/"false" string
-
-### P26-T02 — Auto-create Grain task on visual regression
-
-- **Status:** done
-- **Task ID:** TASK-0072
-- `grain/auto_task.py` `create_regression_task()`; wired into `_do_compare` when `auto_create=True`
-
-### P26-T03 — Auto-create Grain task on check failure
-
-- **Status:** done
-- **Task ID:** TASK-0073
-- `create_check_failure_task()` wired into `check_cmd`; one task per failing check
-
-### P26-T04 — Task deduplication
-
-- **Status:** done
-- **Task ID:** TASK-0074
-- `_is_duplicate()` scans `assay-*.json` in dest_dir; deduplicates on `issue_type+url` (regression) and `issue_type+check_id+target` (check)
-
-### P26-T05 — Suggested remediation in task content
-
-- **Status:** done
-- **Task ID:** TASK-0075
-- `suggest_remediation()` maps check_type+assertion_name to plain-language suggestions; `remediation` field in all auto-created packets
-
----
-
-## v0.4.0
-
----
-
-## 27. Phase 27 — Multi-viewport Testing
-
-### P27-T01 — assay run --viewports mobile,tablet,desktop: run same test at multiple widths
-
+### P28-T01 — `assay run --viewports mobile,tablet,desktop`
 - **Status:** pending
+- **Description:** Run the same test at multiple viewport widths in a single invocation. Each viewport produces its own packet and screenshot. Baseline and diff tracked per viewport independently.
+- **Files:** `src/assay/runner/runner.py`, `src/assay/cli/main.py`, tests
 
-### P27-T02 — Viewport results in dashboard: side-by-side view per capture session
-
+### P28-T02 — Viewport results in dashboard
 - **Status:** pending
+- **Description:** Side-by-side view per capture session in the dashboard. Filter and diff by viewport.
+- **Files:** dashboard routes, templates
+- **Dependencies:** P28-T01
 
-### P27-T03 — Viewport regression: diff per viewport independently, separate approve/reject
-
+### P28-T03 — Viewport regression: diff per viewport independently
 - **Status:** pending
+- **Description:** Separate approve/reject per viewport. Regression in one viewport does not affect others.
+- **Files:** `src/assay/diff/engine.py`, baseline service
+- **Dependencies:** P28-T01
 
 ---
 
-## 28. Phase 28 — Alerts + Webhooks
+### Phase 29 — Alerts and Webhooks
 
-### P28-T01 — Webhook config: assay.toml [alerts] with URL + events (fail, regression, pass)
+> **Status:** planned.
 
+### P29-T01 — Webhook config: `assay.toml [alerts]`
 - **Status:** pending
+- **Description:** `[alerts]` block in `assay.toml` with `url` and `events` list (`fail`, `regression`, `pass`). Validated at startup.
+- **Files:** `src/assay/config.py`
 
-### P28-T02 — Webhook delivery: POST JSON payload on triggered events
-
+### P29-T02 — Webhook delivery
 - **Status:** pending
+- **Description:** POST JSON payload on triggered events. Retry on failure (3 attempts, exponential backoff). Non-blocking — never delays the run result.
+- **Files:** `src/assay/alerts/webhook.py` (new)
+- **Dependencies:** P29-T01
 
-### P28-T03 — Slack integration: pre-built Slack webhook format with screenshot link
-
+### P29-T03 — Slack integration
 - **Status:** pending
+- **Description:** Pre-built Slack webhook format with screenshot link and outcome summary.
+- **Files:** `src/assay/alerts/slack.py` (new)
+- **Dependencies:** P29-T02
 
-### P28-T04 — Email alerts: SMTP config + HTML email on failure or regression
-
+### P29-T04 — Email alerts
 - **Status:** pending
+- **Description:** SMTP config in `assay.toml [alerts]`. HTML email on failure or regression.
+- **Files:** `src/assay/alerts/email.py` (new)
+- **Dependencies:** P29-T01
 
 ---
 
-## 29. Phase 29 — Multi-user + Org Accounts
+## Backlog Maintenance Rules
 
-### P29-T01 — User registration + login: email/password accounts, JWT sessions
-
-- **Status:** pending
-
-### P29-T02 — Org model: users belong to an org, data isolated per org
-
-- **Status:** pending
-
-### P29-T03 — Invite flow: invite teammates by email, accept via link
-
-- **Status:** pending
-
-### P29-T04 — Per-key access scoping: restrict API keys to specific projects or users
-
-- **Status:** pending
-
-### P29-T05 — Billing hooks: usage tracking per org (prep for paid tiers)
-
-- **Status:** pending
+1. Backlog items must remain concrete and implementable
+2. Closed phases are collapsed to a stub entry — verbose task descriptions live in the task archive
+3. Version headers mark when features shipped or are targeted to ship
