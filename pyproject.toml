@@ -3,13 +3,13 @@ name = "assay-kit"
 version = "0.2.0"
 description = "Independent verification layer for software projects"
 readme = "README.md"
-license = { text = "MIT" }
+license = "AGPL-3.0-only"
 authors = [{ name = "Shaznay Sison" }]
 keywords = ["testing", "verification", "playwright", "automation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """API key store — create, list, revoke, and verify keys with bcrypt hashing."""
 
 from __future__ import annotations

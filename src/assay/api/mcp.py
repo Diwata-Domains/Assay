@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Assay MCP server — exposes visual regression verification tools over HTTP."""
 import logging
 from typing import Any

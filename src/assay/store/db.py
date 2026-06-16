@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """SQLite store for Assay result packets — stdlib sqlite3 only."""
 
 from __future__ import annotations

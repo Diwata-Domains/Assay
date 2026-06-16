@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """File-change poller using mtime tracking — no external dependencies."""
 
 from __future__ import annotations
