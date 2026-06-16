@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """HTML report formatter — produces a single self-contained file with inline screenshots."""
 
 from __future__ import annotations

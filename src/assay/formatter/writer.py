@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Packet file writer — serialises a Grain Sentinel payload dict to disk."""
 
 from __future__ import annotations

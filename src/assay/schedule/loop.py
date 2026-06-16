@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Foreground scheduler loop — loads schedules from store and fires runner jobs."""
 
 from __future__ import annotations

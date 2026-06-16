@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024-2026 Shaznay Sison
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Playwright runner module — Docker and direct (no-Docker) modes.
 
 Starts an ephemeral Docker container from the Playwright runner image,
