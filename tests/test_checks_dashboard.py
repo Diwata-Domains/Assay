@@ -16,8 +16,7 @@ _EMAIL = "admin@test.com"
 
 
 def _setup_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    from warden import WardenConfig, issue_token
-
+    from assay._vendor.warden import WardenConfig, issue_token
     from assay.auth.admin import hash_password
 
     monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
