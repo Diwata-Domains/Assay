@@ -21,7 +21,15 @@ Assay is an independent verification layer for software projects. It runs Playwr
 4. Update `docs/working/current_task.md` with the task ID and path
 5. Update `docs/working/backlog.md` to reflect `in_progress`
 
-The current highest task ID is **TASK-0031**. Next is **TASK-0032**.
+Do not trust a hardcoded counter — derive the next task ID from the archive each time:
+
+```bash
+ls -d tasks/archive/phase-*/*/ | grep -oE 'TASK-[0-9]+' | sort -t- -k2 -n | tail -1
+```
+
+As of the 2026-06-25 reconciliation the archive max is **TASK-0076**, so the next packet is
+**TASK-0077**. (IDs restart once: Phases 1–5 use 0001…0026, then Phase 6 restarts at 0001
+and runs monotonically to 0076 — use the global max from the command above.)
 
 Never skip this step — even in resumed sessions or when the work seems straightforward.
 
@@ -81,4 +89,7 @@ Optional fields: `artifact_refs`, `followup_candidates`, `verified_at`
 
 ## Current State
 
-v0.2.0 complete and published to PyPI as `assay-kit`. 250 pytest passing. Next tasks are in `docs/working/backlog.md` under v0.3+.
+See `docs/working/current_focus.md` for the authoritative active phase. As of 2026-06-25:
+**Phase 28 — Release v0.3.0 + Documentation Reconciliation**. v0.1.0 and v0.2.0 are released
+to PyPI as `assay-kit`; v0.3.0 is implemented (Phases 17–27) and pending release. Task state
+is in `docs/working/backlog.md`.

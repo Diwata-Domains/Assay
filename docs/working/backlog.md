@@ -35,7 +35,7 @@ Key deliverables: `assay schedule add/list/remove`, cron integration (APSchedule
 Key deliverables: E2E coverage for `assay run`, SDK capture → ingest, auth rejection, config precedence.
 
 ## Phase 9 — Packaging + Distribution ✓ CLOSED
-4 tasks done — archived to `tasks/archive/phase-9/`
+7 tasks done — archived to `tasks/archive/phase-9/`
 Key deliverables: PyPI metadata finalized, npm metadata finalized, Docker runner documented, first-run guide.
 
 ---
@@ -79,7 +79,7 @@ Key deliverables: dashboard at `/`, packet list view, packet detail view with in
 Key deliverables: pixel-level diff engine, before/after overlay slider in dashboard, regression detection.
 
 ## Phase 19 — Baseline Management ✓ CLOSED
-5 tasks done — archived to `tasks/archive/phase-19/`
+3 tasks done — archived to `tasks/archive/phase-19/`
 Key deliverables: per-check approve/reject on baseline updates, baseline stored as separate artifact.
 
 ## Phase 20 — CI Integration + GitHub Action ✓ CLOSED
@@ -94,13 +94,15 @@ Key deliverables: HTTP checks (status code, response time, redirect chain), head
 4 tasks done — archived to `tasks/archive/phase-22/`
 Key deliverables: interactive first-run wizard, `AssaySDK.fromEnv()`, `useAssayCapture()` React hook.
 
-## Phase 23 — Grain Integration ✓ CLOSED
-4 tasks done — archived to `tasks/archive/phase-23/`
-Key deliverables: `grain verify` bridge, Grain auto-task creation from Assay results.
+## Phase 23 — Grain Integration ⃠ NEVER OPENED
+Planned (`grain verify` bridge, Grain auto-task creation) but never opened — no archive
+directory exists for this phase. The phase sequence skips 23. Bridge work is tracked in the
+v0.4.0 audit phases below (and CP-002 records the `grain verify ingest` gap).
 
-## Phase 24 — Error Recovery ✓ CLOSED
-Archived to `tasks/archive/phase-24/`
-Key deliverables: runner error handling, retry logic, structured error output in packets.
+## Phase 24 — Error Recovery ⃠ NEVER OPENED
+Planned (runner error handling, retry logic, structured error output) but never opened — no
+archive directory exists for this phase. The phase sequence skips 24. Error-visibility work
+is carried forward into v0.4.0 Phase 30 below.
 
 ## Phase 25 — Script DSL ✓ CLOSED
 5 tasks done — archived to `tasks/archive/phase-25/`
@@ -117,7 +119,8 @@ Key deliverables: `assay check` built-in verification suite, `suggest_remediatio
 
 ## v0.3.0 — Visual Verification (implemented, pending release)
 
-All v0.3.0 features are implemented across Phases 17–26. The release tag has not been cut yet.
+All v0.3.0 features are implemented across Phases 14–27 (Phases 23 and 24 were never opened).
+The release tag has not been cut yet — see Phase 28 below.
 
 ---
 
@@ -229,6 +232,93 @@ All v0.3.0 features are implemented across Phases 17–26. The release tag has n
 - **Dependencies:** P31-T03
 
 ---
+
+## Phase 28 — Release v0.3.0 + Documentation Reconciliation
+
+> Audit (2026-06-25): v0.3.0 "Visual Verification" (dashboard, pixel diff, baselines, CI/GitHub Action, check library, Script DSL) is IMPLEMENTED across Phases 17-27 but never released — pyproject is still 0.2.0 and the public ROADMAP lists shipped features as "Coming." Four planning docs disagree on the active phase and CLAUDE.md's task-ID counter is off by ~45 (agents mint colliding IDs). Make the release and the docs trustworthy before building further.
+
+### P28-T01 — Cut and publish assay-kit v0.3.0
+- **Status:** draft
+- **Description:** Reconcile pyproject version + ROADMAP + CHANGELOG to on-disk reality; tag and publish assay-kit 0.3.0 via an agent-triggerable release path (mirror Diwata's CI-driven release.yml). The code already exists — this is a release, not a build.
+- **Dependencies:** P28-T02
+
+### P28-T02 — Reconcile the four phase-state docs to one truth
+- **Status:** draft
+- **Description:** current_focus / backlog / current_task / project_state give four different active phases. Pick the on-disk truth (archive reaches Phase 27 / TASK-0076), collapse closed phases, fix the claimed-but-absent phase-23/24 archive entries, reduce to a single authoritative Current Phase + ledger.
+- **Dependencies:** none
+
+### P28-T03 — Fix CLAUDE.md task-ID counter
+- **Status:** draft
+- **Description:** CLAUDE.md and AGENTS.md carried a stale hardcoded task-ID counter (off by ~45) while the archive reaches TASK-0076 — agents following it mint colliding IDs. Fixed in the 2026-06-25 reconciliation: both now derive the next ID from the archive max rather than a hardcoded number.
+- **Dependencies:** none
+
+### P28-T04 — Refresh canonical product_scope.md
+- **Status:** draft
+- **Description:** Canonical product_scope.md still lists dashboard / multi-user / OAuth as v1 NON-goals though dashboard + auth are shipped. Human-approved change proposal to refresh it to the real surface.
+- **Dependencies:** none
+
+## Phase 29 — Agent-Usable Verification Surface
+
+> Make Assay fully familiar-drivable (agent-usable, agent-agnostic). The CLI is the most complete surface, but the MCP server is a STUB returning canned data — it misleads agents into believing they triggered a real run (the biggest agent-correctness risk). The browser SDK is NOT the agent path. Baseline approval is dashboard-only.
+
+### P29-T01 — Replace the MCP stub with a real engine-backed server
+- **Status:** draft
+- **Description:** Wire run_verification/get_report in src/assay/api/mcp.py to the real runner + store/diff results (today they return canned JSON). Authenticate /mcp/* instead of leaving it public.
+- **Dependencies:** none
+
+### P29-T02 — Expand the MCP/HTTP tool contract to full-loop coverage
+- **Status:** draft
+- **Description:** Mirror the Grain-as-engine expansion: submit, status/poll (job IDs), structured report, list-by-task, baseline approve/reject. Publish one machine-readable tool+schema+endpoint manifest as the agent source of truth.
+- **Dependencies:** P29-T01
+
+### P29-T03 — JSON output everywhere + non-interactive init + async job model
+- **Status:** draft
+- **Description:** Add --format json to run/check/schedule/key; add flags to assay init (no prompts/getpass) for zero-touch agent setup; give assay run a job-id + outcome + packet-path async contract with polling.
+- **Dependencies:** none
+
+### P29-T04 — Headless baseline approve/reject/set
+- **Status:** draft
+- **Description:** CLI + API-key HTTP to approve/reject/set baselines and list them as JSON, so agents drive the diff/baseline workflow without the dashboard UI.
+- **Dependencies:** P29-T01
+
+### P29-T05 — Agent-access docs + SDK reconciliation
+- **Status:** draft
+- **Description:** Document that AGENTS use the CLI / POST /ingest (JSON Schema) / MCP — NOT the browser SDK (its capture() is DOM-locked, throws in Node). Fix the @diwata-labs/assay-sdk vs assay-sdk README name drift. Optional: headless submit(payload) on the SDK (split transport from capture) + a small Python /ingest helper.
+- **Dependencies:** none
+
+## Phase 30 — Adversarial AI Code Review (v-next verification mode)
+
+> Founder-decided v-next: adversarial / multi-agent AI code review as a NEW verification MODE, callable through the grain verify bridge, populating grain review's approved/needs_fix verdict (memory: assay-vnext-adversarial-review). Greenfield — no LLM/agent code in src/ today. BLOCKED-BY: the bridge is half-real — CP-002 records that `grain verify ingest` does not exist in the current Grain CLI; close that first or the verdict never flows back.
+
+### P30-T01 — Close the grain verify bridge gap (cross-product, Grain side)
+- **Status:** blocked
+- **Description:** Confirm/implement `grain verify ingest` in the Grain CLI so the Assay→Grain verdict loop closes (resolve CP-002). Until then, assay submit only drops a file in an inbox; the agent-to-agent loop is not closed.
+- **Dependencies:** Grain CLI (grain verify ingest)
+
+### P30-T02 — Define the code_review verdict contract (change proposal)
+- **Status:** draft
+- **Description:** CP to map approved/needs_fix to packet outcome (pass/fail/inconclusive); add an optional review block (findings with file/line/severity/message, verdict, reviewers, confidence) to assay_payload.schema.json + data_contracts.md; add a code_review issue_type. Backward-compatible.
+- **Dependencies:** none
+
+### P30-T03 — Multi-agent code_review runner
+- **Status:** draft
+- **Description:** New src/assay/review/: adversarial proposer/critic + judge producing a deterministic verdict; provider-neutral LLM client behind an optional extra (preserve standalone, no-hard-external-dep posture); persist findings + transcripts as artifacts.
+- **Dependencies:** P30-T02
+
+### P30-T04 — Non-URL verification input (git diff / refs / file set)
+- **Status:** draft
+- **Description:** Today every path is URL/screenshot-shaped. Add input plumbing for repo path + base/head ref or changed-file list so a verification can target a diff/PR instead of a URL.
+- **Dependencies:** P30-T03
+
+### P30-T05 — Wire code_review as a bridge-callable, packet-emitting mode
+- **Status:** draft
+- **Description:** assay review --repo . --base <ref> --head <ref> --task-id TASK-XXXX --verification-id VERIFY-XXXX-NNN [--submit] → run the runner, format_review_packet (outcome from verdict, issue_type code_review, review block, findings as artifact_refs), write to store, reuse _do_submit. Existing checks never emit packets — code_review must use the run/submit path.
+- **Dependencies:** P30-T04, P30-T01
+
+### P30-T06 — Real MCP code_review tool + integration tests
+- **Status:** draft
+- **Description:** Expose code_review over /mcp/call (inputs: repo/diff refs, task_id, verification_id) wired to the runner. Integration tests: fixture repo + mocked LLM, schema-valid packet, verdict-to-outcome mapping, verification_id passthrough, both approved and needs_fix.
+- **Dependencies:** P30-T05
 
 ## Backlog Maintenance Rules
 

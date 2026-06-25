@@ -24,7 +24,17 @@ This project uses **Grain** for task and phase management. Grain is the operator
 
 **Never skip task packet creation.** Even in resumed sessions where work feels ready to begin, create the packet first. This was logged as a known friction point (`docs/working/tooling_notes.md`, 2026-04-22).
 
-Task packets are numbered sequentially. The current highest task ID is **TASK-0031**. The next task is **TASK-0032**.
+Task packets are numbered sequentially. **Do not trust a hardcoded counter** — derive the
+next ID from the archive each time:
+
+```bash
+ls -d tasks/archive/phase-*/*/ | grep -oE 'TASK-[0-9]+' | sort -t- -k2 -n | tail -1
+```
+
+As of the 2026-06-25 reconciliation the archive max is **TASK-0076**, so the next task is
+**TASK-0077**. (Historical note: IDs restart once — Phases 1–5 use TASK-0001…0026, then
+Phase 6 restarts at TASK-0001 and runs monotonically to TASK-0076 at Phase 27. Use the
+global max from the command above, not the last phase's local numbering.)
 
 Templates are in `templates/` — use them for new packets.
 
@@ -82,4 +92,6 @@ source .venv/bin/activate
 
 ## Current Phase
 
-**v0.2.0 complete** (Phases 10–13). Next work is v0.3+ from `docs/working/backlog.md` or any new phase the operator defines.
+See `docs/working/current_focus.md` for the authoritative active phase and closed-phase
+ledger. As of 2026-06-25: **Phase 28 — Release v0.3.0 + Documentation Reconciliation**.
+v0.1.0 and v0.2.0 are released; v0.3.0 is implemented (Phases 17–27) and pending release.

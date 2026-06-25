@@ -202,3 +202,81 @@ assay schedule run    Start the foreground scheduler loop (runs until Ctrl+C)
 ### Decision needed from
 
 Project owner — approve to update `data_contracts.md §5` with the new command.
+
+---
+
+## CP-004 — Refresh canonical `product_scope.md` to the shipped surface (dashboard + auth are no longer non-goals)
+
+**Status:** proposed (2026-06-25)
+**Proposed by:** Phase 28 documentation reconciliation (P28-T04)
+**Affects:** `docs/canonical/product_scope.md` §3 (Non-Goals), §5 (Key Capabilities), §6 (Scope Boundaries), §8 (Monetization)
+**Requires:** human approval per canonical-doc rule (`CLAUDE.md` §Canonical Docs)
+
+---
+
+### Finding
+
+`docs/canonical/product_scope.md` is frozen at the v1 framing and now contradicts the
+shipped product. It still lists capabilities that have been implemented and released (or are
+implemented and pending the v0.3.0 release) as **v1 NON-goals / deferred to v2**:
+
+- §3 Non-Goals (v1) lists **"Web UI or dashboard"** and **"Multi-user account management"**
+  and **"OAuth / SSO authentication"** as non-goals.
+- §6 "Explicitly deferred to v2" repeats **"Web UI / dashboard"**, **"Multi-user accounts"**,
+  and **"OAuth / SSO / advanced auth"**.
+
+On-disk reality (Phases 17–27, archived under `tasks/archive/`):
+
+- **Web UI / dashboard SHIPPED** — Phase 17 (Web UI / Dashboard), Phase 18 (diff engine +
+  before/after slider in dashboard), Phase 19 (baseline approve/reject in dashboard).
+- **Admin auth SHIPPED** — the hosted dashboard ships single-admin auth + API key management
+  UI (JWT-protected admin endpoints; see `project_state.md` and the backlog v0.3.0 ledger).
+- Multi-user / org accounts and full OAuth/SSO remain genuinely future work (the client
+  access layer is planned in v0.4.0 backlog Phase 31), so those specific items can stay
+  deferred — but the blanket "no dashboard / no auth" framing is wrong.
+
+Agents and operators reading the canonical scope are being told the dashboard and auth are
+out of scope while the code, the dashboard routes, and the auth module all exist.
+
+---
+
+### Proposed changes to `product_scope.md`
+
+**§3 Non-Goals (v1):**
+- REMOVE "Web UI or dashboard" (shipped, Phase 17).
+- REMOVE "OAuth / SSO authentication" as an absolute non-goal; reframe as: *"Multi-tenant
+  OAuth / SSO — deferred; v0.3.0 ships single-admin auth + API-key auth only."*
+- KEEP "Bug bounty public portal", "SaaS deployment / hosted infrastructure" as non-goals.
+- Reframe "Multi-user account management" → *"Multi-user / org accounts — planned for v0.4.0
+  (client access layer, backlog Phase 31), not in v0.3.0."*
+
+**§5 Key Capabilities:** ADD the shipped surface:
+- Self-hosted **web dashboard** (packet history, packet detail, before/after diff slider,
+  baseline approve/reject).
+- **Visual regression**: baseline capture, pixel-diff engine, `assay run --compare`.
+- **Single-admin auth** (JWT) + API-key management UI on the hosted dashboard.
+- **Check library** (HTTP / header / auth checks) and **JSON Script DSL** (`assay run --script`).
+- **CI integration**: GitHub Action with non-zero exit on regression + commit-status posting.
+- **Multi-viewport** capture/diff.
+
+**§6 Scope Boundaries:** move dashboard + single-admin auth from "deferred to v2" into "in
+scope (shipped in v0.3.0)"; keep org accounts / OAuth-SSO / SaaS hosting deferred.
+
+**§8 Monetization:** note that admin auth + per-project API keys are now in place as the auth
+surface; usage/subscription billing still deferred.
+
+---
+
+### What does NOT change
+
+- Assay's core identity as an independent verification layer with no hard Grain dependency (§1, §7).
+- The standalone-first posture (Docker required; local filesystem output).
+- Genuinely-future items: org/multi-tenant accounts, full OAuth/SSO, SaaS hosting, public
+  bug-bounty portal remain non-goals / deferred.
+
+---
+
+### Decision needed from
+
+Project owner — approve, reject, or amend. On approval, apply the edits directly to
+`docs/canonical/product_scope.md` and mark this proposal `applied`.
