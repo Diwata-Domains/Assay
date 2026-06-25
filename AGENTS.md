@@ -114,6 +114,35 @@ Headless baselines are also exposed over API-key HTTP: `GET /baselines`,
 The shared engine behind all three surfaces is `src/assay/api/service.py` (CLI/HTTP/MCP all
 call it, so behaviour is identical). See README "Agent / programmatic access" for examples.
 
+### Telemetry (Pulse emitter — opt-in, off by default)
+
+`src/assay/telemetry.py` emits a `verification.completed` event to **Pulse** when a
+verification finishes. It is **opt-in and side-band**: with telemetry off (the default) there
+is zero behaviour change — no event is emitted and no queue file is written.
+
+Enable it either way:
+- set `ASSAY_TELEMETRY_ENDPOINT=<pulse-ingest-url>` (env alone turns it on and is the POST target), or
+- add a `[telemetry]` block to `assay.toml`:
+  ```toml
+  [telemetry]
+  enabled = true
+  endpoint = "https://pulse.example/ingest"   # optional; omit to queue only
+  ```
+  (`ASSAY_TELEMETRY_ENDPOINT` wins over the toml `endpoint` when both are set.)
+
+Emission is fire-and-forget on a short-lived daemon thread — it NEVER raises and NEVER delays
+the verification result. The event is POSTed (`Content-Type: application/json`, stdlib urllib);
+on an unreachable/unset endpoint it is appended to `.assay/telemetry_queue.jsonl` (one JSON
+object per line, the exact shape `pulse drain` accepts). The envelope matches Grain/Pulse
+exactly — `{event_type, version, timestamp, payload}` — and the payload is counts + identifiers
+only (no PII, no screenshots/artifacts):
+
+```json
+{"event_type": "verification.completed", "version": 1, "timestamp": "<iso-8601>",
+ "payload": {"verification_id": "...", "target": "...", "passed": true,
+             "checks_total": 1, "checks_passed": 1}}
+```
+
 ---
 
 ## Current State
