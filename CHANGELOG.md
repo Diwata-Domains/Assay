@@ -1,3 +1,12 @@
+## [0.3.0] — 2026-06-25
+
+### Documentation
+- scaffold telemetry-layer planning workspace
+- reconcile drifted planning docs to one truth (Phase 28)
+
+### Features
+- add cross-document doc-drift checks to docs audit
+
 # Changelog
 
 All notable changes to assay-kit are documented here.
