@@ -244,15 +244,16 @@ def make_verification_completed_event(
     """Build a versioned verification.completed event.
 
     Payload is counts + identifiers only (no PII, no screenshots/artifacts):
-    ``verification_id``, ``target``, ``passed``, ``checks_total``,
-    ``checks_passed``.
+    ``run_id`` (the verification id), ``target``, ``passed``, ``checks_total``,
+    ``checks_passed`` — the field names are the Pulse ingest contract
+    (docs/working/integration_grain_assay.md).
     """
     return TelemetryEvent(
         event_type=EVENT_VERIFICATION_COMPLETED,
         version=TELEMETRY_EVENT_VERSION,
         timestamp=_now_iso(),
         payload={
-            "verification_id": verification_id,
+            "run_id": verification_id,
             "target": target,
             "passed": passed,
             "checks_total": checks_total,

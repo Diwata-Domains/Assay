@@ -119,7 +119,7 @@ def test_toml_enabled_no_endpoint_queues_exact_envelope(tmp_path, monkeypatch):
     assert event["version"] == TELEMETRY_EVENT_VERSION
     assert event["timestamp"]
     assert event["payload"] == {
-        "verification_id": "VERIFY-0001-001",
+        "run_id": "VERIFY-0001-001",
         "target": "https://example.com",
         "passed": False,
         "checks_total": 3,
@@ -139,7 +139,7 @@ def test_env_endpoint_enables_and_falls_back_to_queue(tmp_path, monkeypatch):
     queued = _read_queue(tmp_path)
     assert len(queued) == 1
     assert queued[0]["event_type"] == EVENT_VERIFICATION_COMPLETED
-    assert queued[0]["payload"]["verification_id"] == "V-9"
+    assert queued[0]["payload"]["run_id"] == "V-9"
 
 
 def test_endpoint_post_success_does_not_queue(tmp_path, monkeypatch):
@@ -255,7 +255,7 @@ def test_run_verification_emits_when_enabled(tmp_path, monkeypatch):
     event = queued[0]
     assert event["event_type"] == EVENT_VERIFICATION_COMPLETED
     assert event["payload"] == {
-        "verification_id": "VERIFY-0042-001",
+        "run_id": "VERIFY-0042-001",
         "target": "https://example.com",
         "passed": False,
         "checks_total": 1,
