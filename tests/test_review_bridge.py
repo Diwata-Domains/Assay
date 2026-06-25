@@ -174,10 +174,14 @@ def test_review_needs_fix_emits_schema_valid_fail_packet(
     packet = json.loads(Path(str(payload["packet_path"])).read_text())
     jsonschema.validate(instance=packet, schema=ASSAY_PAYLOAD)
     assert packet["outcome"] == "fail"
+    assert packet["issue_type"] == "code_review"
     assert packet["verification_id"] == "VERIFY-0099-001"
     assert packet["task_id"] == "TASK-0099"
     # the runner persisted transcript + findings artifacts and they are referenced
     assert packet["artifact_refs"]
+    # CP-005: the structured review block is surfaced on the wire
+    assert packet["review"]["verdict"] == "fail"
+    assert packet["review"]["findings"]
 
 
 def test_review_approved_emits_schema_valid_pass_packet(
@@ -213,7 +217,10 @@ def test_review_approved_emits_schema_valid_pass_packet(
     packet = json.loads(Path(str(payload["packet_path"])).read_text())
     jsonschema.validate(instance=packet, schema=ASSAY_PAYLOAD)
     assert packet["outcome"] == "pass"
+    assert packet["issue_type"] == "code_review"
     assert packet["verification_id"] == "VERIFY-0100-001"
+    # CP-005: the structured review block is surfaced on the wire
+    assert packet["review"]["verdict"] == "pass"
 
 
 def test_review_persists_packet_to_store(
@@ -272,6 +279,8 @@ def test_review_submit_reuses_do_submit_copy(
     jsonschema.validate(instance=submitted, schema=ASSAY_PAYLOAD)
     assert submitted["verification_id"] == "VERIFY-0102-001"
     assert submitted["outcome"] == "pass"
+    assert submitted["issue_type"] == "code_review"
+    assert submitted["review"]["verdict"] == "pass"
 
 
 # --------------------------------------------------------------------------- #
@@ -344,6 +353,8 @@ def test_mcp_code_review_returns_needs_fix_verdict(
     packet = next(p for p in packets if p.get("verification_id") == "VERIFY-0103-001")
     jsonschema.validate(instance=packet, schema=ASSAY_PAYLOAD)
     assert packet["outcome"] == "fail"
+    assert packet["issue_type"] == "code_review"
+    assert packet["review"]["verdict"] == "fail"
 
 
 def test_mcp_code_review_returns_approved_verdict(

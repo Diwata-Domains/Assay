@@ -14,10 +14,10 @@ The mapping is the load-bearing contract for the Assay -> Grain bridge:
     fail           fail           needs_fix
     inconclusive   inconclusive   needs_human
 
-`format_review_packet` emits a packet that is valid against the CURRENT frozen
-`assay_payload.schema.json`: until CP-005 lands it reuses `issue_type = "bug_finding"` and
-folds findings into `summary` + `artifact_refs` rather than emitting an unschema'd `review`
-block or the not-yet-approved `code_review` issue_type.
+`format_review_packet` emits a packet that is valid against `assay_payload.schema.json`:
+since CP-005 landed it uses `issue_type = "code_review"` and surfaces the structured verdict
+(verdict, findings, reviewers, confidence) in the optional `review` block, while still folding
+findings into `summary` + `artifact_refs`.
 """
 
 from __future__ import annotations
@@ -65,8 +65,8 @@ _OUTCOME_TO_GRAIN_REVIEW: dict[PacketOutcome, GrainReviewVerdict] = {
     PacketOutcome.INCONCLUSIVE: GrainReviewVerdict.NEEDS_HUMAN,
 }
 
-# Until CP-005 is applied, code_review packets stay schema-valid by reusing this issue_type.
-REVIEW_ISSUE_TYPE = "bug_finding"
+# CP-005 (applied 2026-06-25): code_review is a first-class issue_type in the payload contract.
+REVIEW_ISSUE_TYPE = "code_review"
 
 _SEVERITY_VALUES = ("info", "warning", "error", "critical")
 
@@ -173,7 +173,7 @@ class CodeReviewResult:
         return _VERDICT_TO_SEVERITY[self.verdict]
 
     def review_block(self) -> dict[str, object]:
-        """The structured `review` block (surfaced on the wire once CP-005 is applied)."""
+        """The structured `review` block surfaced on the wire (CP-005)."""
         return {
             "verdict": self.verdict.value,
             "findings": [f.to_dict() for f in self.findings],
@@ -227,13 +227,13 @@ def format_review_packet(
     artifact_refs: Optional[list[str]] = None,  # noqa: UP007
     verified_at: Optional[str] = None,  # noqa: UP007
 ) -> dict[str, object]:
-    """Convert a CodeReviewResult into an Assay payload dict valid against the FROZEN schema.
+    """Convert a CodeReviewResult into an Assay payload dict valid against the schema.
 
-    Backward-compatible until CP-005 lands:
-    - `issue_type` is `bug_finding` (not the not-yet-approved `code_review`).
-    - No `review` block is emitted (the schema is additionalProperties:false). The structured
-      findings are preserved via `summary` and `artifact_refs` (the runner writes findings +
-      transcripts to disk and passes their paths here).
+    Since CP-005 landed:
+    - `issue_type` is `code_review`.
+    - The structured verdict is surfaced in the optional `review` block (verdict, findings,
+      reviewers, confidence). The findings are also preserved via `summary` and `artifact_refs`
+      (the runner writes findings + transcripts to disk and passes their paths here).
     """
     refs = list(artifact_refs) if artifact_refs else []
     for ref in result.transcript_refs:
@@ -250,4 +250,5 @@ def format_review_packet(
         "artifact_refs": refs,
         "followup_candidates": [],
         "verified_at": verified_at if verified_at else _now_iso(),
+        "review": result.review_block(),
     }
