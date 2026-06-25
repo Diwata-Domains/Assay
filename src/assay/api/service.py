@@ -19,6 +19,7 @@ import shutil
 from pathlib import Path
 from typing import Callable, Optional
 
+from assay import telemetry as _telemetry
 from assay.formatter.formatter import format_packet
 from assay.formatter.writer import write_packet
 from assay.runner import artifacts as _artifacts
@@ -126,7 +127,43 @@ def run_verification(
         result["error"] = bundle.error
     if diff_info is not None:
         result["diff"] = diff_info
+
+    _emit_verification_completed(vid, str(packet["url"]), bundle)
     return result
+
+
+def _check_counts(bundle: _artifacts.ArtifactBundle) -> tuple[int, int]:
+    """Return (checks_total, checks_passed) for a verification.
+
+    Script runs carry per-step results; a single-shot run is one logical check
+    keyed off the overall outcome. Counts only — never any step content.
+    """
+    if bundle.steps:
+        total = len(bundle.steps)
+        passed = sum(1 for s in bundle.steps if s.outcome == "pass")
+        return total, passed
+    passed = 1 if bundle.outcome == "pass" else 0
+    return 1, passed
+
+
+def _emit_verification_completed(
+    verification_id: str,
+    target: str,
+    bundle: _artifacts.ArtifactBundle,
+) -> None:
+    """Side-band telemetry hook — opt-in, fire-and-forget, never affects the result."""
+    if not _telemetry.is_enabled():
+        return
+    checks_total, checks_passed = _check_counts(bundle)
+    _telemetry.emit(
+        _telemetry.make_verification_completed_event(
+            verification_id,
+            target,
+            passed=bundle.outcome == "pass",
+            checks_total=checks_total,
+            checks_passed=checks_passed,
+        )
+    )
 
 
 def _diff_against_baseline(
