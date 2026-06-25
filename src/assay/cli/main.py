@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import getpass
+import os
 import secrets
 import shutil
 from pathlib import Path
@@ -31,11 +32,13 @@ schedule_app = typer.Typer(help="Manage scheduled test runs.")
 key_app = typer.Typer(help="Manage API keys for the ingest endpoint.")
 store_app = typer.Typer(help="Manage the SQLite packet store.")
 admin_app = typer.Typer(help="Admin credential management.")
+baseline_app = typer.Typer(help="Manage visual-regression baselines (headless; no dashboard).")
 
 app.add_typer(schedule_app, name="schedule")
 app.add_typer(key_app, name="key")
 app.add_typer(store_app, name="store")
 app.add_typer(admin_app, name="admin")
+app.add_typer(baseline_app, name="baseline")
 
 _NOT_IMPLEMENTED = "not implemented"
 
@@ -64,44 +67,102 @@ store = "~/.assay/schedules.json"
 @app.command()
 def init(
     force: bool = typer.Option(False, "--force", help="Overwrite existing assay.toml without prompting."),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        "--yes",
+        "-y",
+        help="Zero-touch setup for agents: never prompt; use flags/defaults. Implies --force.",
+    ),
+    name: Optional[str] = typer.Option(None, "--name", help="Project name (non-interactive)."),  # noqa: UP007
+    output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Output directory (non-interactive)."),  # noqa: UP007,E501
+    port: Optional[int] = typer.Option(None, "--port", help="Serve port (non-interactive)."),  # noqa: UP007
+    admin_email: Optional[str] = typer.Option(None, "--admin-email", help="Admin email (non-interactive)."),  # noqa: UP007,E501
+    admin_password: Optional[str] = typer.Option(  # noqa: UP007
+        None,
+        "--admin-password",
+        help="Admin password (non-interactive). Hashed before printing; never stored in assay.toml.",
+    ),
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
-    """Interactive first-run setup: write assay.toml and print .env block."""
+    """First-run setup: write assay.toml and print the .env block.
+
+    Pass --non-interactive (with --admin-email/--admin-password or env vars) for zero-touch
+    agent setup that never prompts. Falls back to interactive prompts otherwise.
+    """
+    import json as _json
+
+    from assay.auth.admin import hash_password
+
+    json_mode = format == "json"
+    # JSON output implies a non-interactive contract.
+    if json_mode:
+        non_interactive = True
     config_path = Path("assay.toml")
 
-    if config_path.exists() and not force:
+    if config_path.exists() and not force and not non_interactive:
         overwrite = typer.confirm(f"{config_path} already exists. Overwrite?", default=False)
         if not overwrite:
             typer.echo("Aborted.")
             raise typer.Exit(0)
 
-    typer.echo("Setting up Assay. Press Enter to accept defaults.\n")
+    if non_interactive:
+        resolved_name = name or Path.cwd().name
+        resolved_output = output_dir or "./assay-output"
+        resolved_port = port if port is not None else 8000
+        resolved_email = admin_email or os.environ.get("ASSAY_ADMIN_EMAIL", "")
+        resolved_password = admin_password or os.environ.get("ASSAY_ADMIN_PASSWORD", "")
+        if not resolved_email:
+            typer.echo("error: --admin-email (or ASSAY_ADMIN_EMAIL) required in non-interactive mode", err=True)
+            raise typer.Exit(2)
+        if not resolved_password:
+            typer.echo(
+                "error: --admin-password (or ASSAY_ADMIN_PASSWORD) required in non-interactive mode",
+                err=True,
+            )
+            raise typer.Exit(2)
+    else:
+        typer.echo("Setting up Assay. Press Enter to accept defaults.\n")
+        resolved_name = name or typer.prompt("Project name", default=Path.cwd().name)
+        resolved_output = output_dir or typer.prompt("Output directory", default="./assay-output")
+        resolved_port = port if port is not None else typer.prompt("Serve port", default=8000, type=int)
+        resolved_email = admin_email or typer.prompt("Admin email")
+        resolved_password = admin_password or getpass.getpass("Admin password: ")
+        if not resolved_password:
+            typer.echo("error: password cannot be empty", err=True)
+            raise typer.Exit(1)
+        confirm = getpass.getpass("Confirm password: ")
+        if resolved_password != confirm:
+            typer.echo("error: passwords do not match", err=True)
+            raise typer.Exit(1)
 
-    name = typer.prompt("Project name", default=Path.cwd().name)
-    output_dir = typer.prompt("Output directory", default="./assay-output")
-    port = typer.prompt("Serve port", default=8000)
-    admin_email = typer.prompt("Admin email")
-
-    password = getpass.getpass("Admin password: ")
-    if not password:
-        typer.echo("error: password cannot be empty", err=True)
-        raise typer.Exit(1)
-    confirm = getpass.getpass("Confirm password: ")
-    if password != confirm:
-        typer.echo("error: passwords do not match", err=True)
-        raise typer.Exit(1)
-
-    from assay.auth.admin import hash_password
-    password_hash = hash_password(password)
+    password_hash = hash_password(resolved_password)
     jwt_secret = secrets.token_urlsafe(32)
 
     config_path.write_text(
-        _TOML_TEMPLATE.format(name=name, output_dir=output_dir, port=port),
+        _TOML_TEMPLATE.format(name=resolved_name, output_dir=resolved_output, port=resolved_port),
         encoding="utf-8",
     )
 
+    if json_mode:
+        typer.echo(
+            _json.dumps(
+                {
+                    "config_path": str(config_path),
+                    "project": resolved_name,
+                    "env": {
+                        "ASSAY_ADMIN_EMAIL": resolved_email,
+                        "ASSAY_ADMIN_PASSWORD_HASH": password_hash,
+                        "WARDEN_SECRET": jwt_secret,
+                    },
+                }
+            )
+        )
+        return
+
     typer.echo("\nassay.toml written.\n")
     typer.echo("Add these to your .env (do not commit this file):\n")
-    typer.echo(f"ASSAY_ADMIN_EMAIL={admin_email}")
+    typer.echo(f"ASSAY_ADMIN_EMAIL={resolved_email}")
     typer.echo(f"ASSAY_ADMIN_PASSWORD_HASH={password_hash}")
     typer.echo(f"WARDEN_SECRET={jwt_secret}")
     typer.echo("\nRun:  assay serve")
@@ -155,13 +216,22 @@ def run(
     ),
     threshold: float = typer.Option(0.1, "--threshold", help="Regression threshold as % changed pixels (default 0.1)."),
     no_docker: bool = typer.Option(False, "--no-docker", help="Run Playwright directly via Node.js (requires node + playwright installed)."),  # noqa: E501
+    format: str = typer.Option("text", "--format", help="Output format: text or json (json emits a machine-readable result)."),  # noqa: E501
 ) -> None:
     """Execute a test run using the Playwright + Docker runner.
 
     Single-URL mode:   assay run --target https://example.com
     Multi-step mode:   assay run --script login-flow.json
     """
+    import json as _json
+
     from assay.grain.detect import detect_task_id
+
+    json_mode = format == "json"
+
+    def _emit(obj: dict[str, object]) -> None:
+        if json_mode:
+            typer.echo(_json.dumps(obj))
 
     if script is not None:
         _run_script_mode(
@@ -186,7 +256,7 @@ def run(
 
     # Resolve task_id: explicit flag > Grain auto-detect
     effective_task_id = task_id or detect_task_id(config.grain.project_root or None)
-    if effective_task_id:
+    if effective_task_id and not json_mode:
         typer.echo(f"task_id: {effective_task_id}")
 
     def _do_run() -> str:
@@ -197,11 +267,15 @@ def run(
         try:
             bundle = _artifacts.collect_artifacts(runner_result.output_dir, runner_result)
         except _artifacts.ArtifactError as exc:
-            typer.echo(f"error reading artifacts: {exc}", err=True)
+            if json_mode:
+                _emit({"outcome": "error", "error": f"artifacts: {exc}"})
+            else:
+                typer.echo(f"error reading artifacts: {exc}", err=True)
             raise typer.Exit(1) from exc
-        typer.echo(f"outcome: {bundle.outcome}")
-        if bundle.error:
-            typer.echo(f"error: {bundle.error}", err=True)
+        if not json_mode:
+            typer.echo(f"outcome: {bundle.outcome}")
+            if bundle.error:
+                typer.echo(f"error: {bundle.error}", err=True)
         try:
             packet = format_packet(bundle, task_id=effective_task_id, verification_id=verification_id)
             packet["url"] = bundle.url or str(target)
@@ -215,15 +289,28 @@ def run(
                     packet["artifact_refs"] = [str(dest)]
                     candidate_png = dest
             packet_path = write_packet(packet, output_dir)
-            typer.echo(f"packet: {packet_path}")
+            if not json_mode:
+                typer.echo(f"packet: {packet_path}")
             _store_packet(packet, config)
         except Exception as exc:
-            typer.echo(f"error writing packet: {exc}", err=True)
+            if json_mode:
+                _emit({"outcome": "error", "error": f"writing packet: {exc}"})
+            else:
+                typer.echo(f"error writing packet: {exc}", err=True)
             raise typer.Exit(1) from exc
         if submit:
             _do_submit(str(packet_path), config)
-        if compare and candidate_png is not None:
+        if compare and candidate_png is not None and not json_mode:
             _do_compare(str(target), candidate_png, vid, output_dir, config, threshold)
+        _emit({
+            "verification_id": vid,
+            "outcome": bundle.outcome,
+            "task_id": effective_task_id,
+            "url": packet["url"],
+            "summary": packet.get("summary", ""),
+            "packet_path": str(packet_path),
+            "artifact_refs": packet.get("artifact_refs", []),
+        })
         return bundle.outcome
 
     if not watch:
@@ -640,14 +727,22 @@ def schedule_add(
 
 
 @schedule_app.command("list")
-def schedule_list(ctx: typer.Context) -> None:
+def schedule_list(
+    ctx: typer.Context,
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
     """List all active schedules."""
+    import json as _json
+
     config: AssayConfig = ctx.obj
     try:
         schedules = list_schedules(config.schedule.store)
     except ScheduleStoreError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
+    if format == "json":
+        typer.echo(_json.dumps({"schedules": schedules}))
+        return
     if not schedules:
         typer.echo("no schedules")
         return
@@ -719,14 +814,20 @@ def schedule_status() -> None:
 def key_create(
     ctx: typer.Context,
     name: Optional[str] = typer.Option(None, "--name", help="Label for the key."),  # noqa: UP007
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     """Generate a new API key."""
+    import json as _json
+
     config: AssayConfig = ctx.obj
     try:
         raw = create_key(config.keys.store, label=name)
     except KeyStoreError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
+    if format == "json":
+        typer.echo(_json.dumps({"key": raw, "label": name}))
+        return
     typer.echo(f"\nkey: {raw}")
     typer.echo("Save this key — it will not be shown again.\n")
     typer.echo("Test it:")
@@ -738,14 +839,22 @@ def key_create(
 
 
 @key_app.command("list")
-def key_list(ctx: typer.Context) -> None:
+def key_list(
+    ctx: typer.Context,
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
     """List all API keys (IDs and labels only)."""
+    import json as _json
+
     config: AssayConfig = ctx.obj
     try:
         keys = list_keys(config.keys.store)
     except KeyStoreError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
+    if format == "json":
+        typer.echo(_json.dumps({"keys": keys}))
+        return
     if not keys:
         typer.echo("no keys")
         return
@@ -815,12 +924,16 @@ def store_import(
 def check_cmd(
     ctx: typer.Context,
     check_id: Optional[str] = typer.Option(None, "--check", help="Run a single check by ID."),  # noqa: UP007
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     """Run named checks defined in [[checks]] in assay.toml."""
+    import json as _json
+
     from assay.checks.models import CheckResult
     from assay.checks.runner import UnknownCheckType, run_check
     from assay.store.db import init_db, insert_check_result
 
+    json_mode = format == "json"
     config: AssayConfig = ctx.obj
     checks = config.checks
 
@@ -831,7 +944,10 @@ def check_cmd(
             raise typer.Exit(2)
 
     if not checks:
-        typer.echo("no checks configured — add [[checks]] blocks to assay.toml")
+        if json_mode:
+            typer.echo(_json.dumps({"checks": [], "passed": True}))
+        else:
+            typer.echo("no checks configured — add [[checks]] blocks to assay.toml")
         raise typer.Exit(0)
 
     db_path = __import__("pathlib").Path(config.store.db).expanduser()
@@ -861,14 +977,49 @@ def check_cmd(
             db_path,
         )
 
+    any_failed = any(not r.passed for r in results)
+
+    if json_mode:
+        payload = {
+            "passed": not any_failed,
+            "checks": [
+                {
+                    "check_id": r.check_id,
+                    "check_type": r.check_type,
+                    "target": r.target,
+                    "passed": r.passed,
+                    "error": r.error,
+                    "assertions": [
+                        {"name": a.name, "passed": a.passed, "expected": a.expected, "actual": a.actual}
+                        for a in r.assertions
+                    ],
+                }
+                for r in results
+            ],
+        }
+        for r in results:
+            if not r.passed and config.grain.auto_create:
+                from assay.grain.auto_task import create_check_failure_task
+                failed_assertions: list[dict[str, object]] = [
+                    {"name": a.name, "expected": a.expected, "actual": a.actual}
+                    for a in r.assertions if not a.passed
+                ]
+                create_check_failure_task(
+                    check_id=r.check_id,
+                    check_type=r.check_type,
+                    target=r.target,
+                    failed_assertions=failed_assertions,
+                    error=r.error,
+                    config=config,
+                )
+        typer.echo(_json.dumps(payload))
+        raise typer.Exit(1 if any_failed else 0)
+
     col = "{:<24}  {:<10}  {:<44}  {}"
     typer.echo(col.format("id", "type", "target", "status"))
     typer.echo("-" * 96)
-    any_failed = False
     for r in results:
         status = "PASS" if r.passed else "FAIL"
-        if not r.passed:
-            any_failed = True
         typer.echo(col.format(r.check_id[:24], r.check_type[:10], r.target[:44], status))
         if r.error:
             typer.echo(f"  error: {r.error}", err=True)
@@ -877,7 +1028,7 @@ def check_cmd(
             typer.echo(f"  {icon} {a.name}: expected={a.expected!r} actual={a.actual!r}")
         if not r.passed and config.grain.auto_create:
             from assay.grain.auto_task import create_check_failure_task
-            failed_assertions: list[dict[str, object]] = [
+            failed_assertions = [
                 {"name": a.name, "expected": a.expected, "actual": a.actual}
                 for a in r.assertions if not a.passed
             ]
@@ -893,6 +1044,84 @@ def check_cmd(
                 typer.echo(f"  grain task: {task_path}")
 
     raise typer.Exit(1 if any_failed else 0)
+
+
+# ---------------------------------------------------------------------------
+# baseline subcommands — headless approve/reject/set/list for agents
+# ---------------------------------------------------------------------------
+
+
+@baseline_app.command("list")
+def baseline_list(
+    ctx: typer.Context,
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """List every set baseline as {url, verification_id}."""
+    import json as _json
+
+    from assay.api import service
+
+    config: AssayConfig = ctx.obj
+    baselines = service.list_baselines(store_db=config.store.db)
+    if format == "json":
+        typer.echo(_json.dumps({"baselines": baselines}))
+        return
+    if not baselines:
+        typer.echo("no baselines")
+        return
+    for b in baselines:
+        typer.echo(f"{b['url']}  {b['verification_id']}")
+
+
+@baseline_app.command("set")
+def baseline_set(
+    ctx: typer.Context,
+    verification_id: str = typer.Argument(..., help="Packet verification_id to set as baseline."),
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Set a packet as the baseline for its URL (no review verdict)."""
+    _baseline_mutate(ctx, "set_baseline", verification_id, format)
+
+
+@baseline_app.command("approve")
+def baseline_approve(
+    ctx: typer.Context,
+    verification_id: str = typer.Argument(..., help="Packet verification_id to approve as baseline."),
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Approve a packet: set it as baseline and mark review_status=approved."""
+    _baseline_mutate(ctx, "approve_baseline", verification_id, format)
+
+
+@baseline_app.command("reject")
+def baseline_reject(
+    ctx: typer.Context,
+    verification_id: str = typer.Argument(..., help="Packet verification_id to reject."),
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Reject a packet: mark review_status=rejected; keep the existing baseline."""
+    _baseline_mutate(ctx, "reject_baseline", verification_id, format)
+
+
+def _baseline_mutate(ctx: typer.Context, fn_name: str, verification_id: str, fmt: str) -> None:
+    import json as _json
+
+    from assay.api import service
+
+    config: AssayConfig = ctx.obj
+    fn = getattr(service, fn_name)
+    try:
+        result = fn(verification_id, store_db=config.store.db)
+    except service.ServiceError as exc:
+        if fmt == "json":
+            typer.echo(_json.dumps({"error": str(exc)}))
+        else:
+            typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    if fmt == "json":
+        typer.echo(_json.dumps(result))
+    else:
+        typer.echo("  ".join(f"{k}={v}" for k, v in result.items()))
 
 
 # admin
