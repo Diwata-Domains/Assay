@@ -305,28 +305,28 @@ The release tag has not been cut yet — see Phase 28 below.
 - **Dependencies:** Grain CLI (grain verify ingest)
 
 ### P30-T02 — Define the code_review verdict contract (change proposal)
-- **Status:** draft
-- **Description:** CP to map approved/needs_fix to packet outcome (pass/fail/inconclusive); add an optional review block (findings with file/line/severity/message, verdict, reviewers, confidence) to assay_payload.schema.json + data_contracts.md; add a code_review issue_type. Backward-compatible.
+- **Status:** done
+- **Description:** Verdict contract landed in `src/assay/review/verdict.py` — deterministic verdict→outcome→grain-review mapping (pass→approved, fail→needs_fix, inconclusive→needs_human), `CodeReviewResult`/`CodeReviewFinding` domain types, and `format_review_packet`. CP-005 (the `review` block + `code_review` issue_type schema change) is filed in change_proposals.md and pending human approval; until it lands the packet stays schema-valid by reusing `issue_type=bug_finding` and folding findings into summary + artifact_refs.
 - **Dependencies:** none
 
 ### P30-T03 — Multi-agent code_review runner
-- **Status:** draft
-- **Description:** New src/assay/review/: adversarial proposer/critic + judge producing a deterministic verdict; provider-neutral LLM client behind an optional extra (preserve standalone, no-hard-external-dep posture); persist findings + transcripts as artifacts.
+- **Status:** done
+- **Description:** `src/assay/review/runner.py` — adversarial proposer(s)/critic + judge producing a deterministic verdict re-derived from the surviving findings (not the judge's free-text label); provider-neutral `LLMClient` Protocol with an opt-in Anthropic default behind the `review` extra; persists transcripts + findings as artifacts.
 - **Dependencies:** P30-T02
 
 ### P30-T04 — Non-URL verification input (git diff / refs / file set)
-- **Status:** draft
-- **Description:** Today every path is URL/screenshot-shaped. Add input plumbing for repo path + base/head ref or changed-file list so a verification can target a diff/PR instead of a URL.
+- **Status:** done
+- **Description:** `src/assay/review/diff.py` `gather_diff()` supports repo path + base/head refs and/or an explicit changed-file list, or a pre-gathered diff string. `run_review`/`run_code_review` accept diff input instead of a URL.
 - **Dependencies:** P30-T03
 
 ### P30-T05 — Wire code_review as a bridge-callable, packet-emitting mode
-- **Status:** draft
-- **Description:** assay review --repo . --base <ref> --head <ref> --task-id TASK-XXXX --verification-id VERIFY-XXXX-NNN [--submit] → run the runner, format_review_packet (outcome from verdict, issue_type code_review, review block, findings as artifact_refs), write to store, reuse _do_submit. Existing checks never emit packets — code_review must use the run/submit path.
+- **Status:** done
+- **Description:** `assay review --repo . --base <ref> --head <ref> --task-id TASK-XXXX --verification-id VERIFY-XXXX-NNN [--submit] [--format json]` drives the runner via `service.run_code_review`, formats a schema-valid packet (outcome from the verdict, `verification_id` passthrough, findings + transcripts as artifact_refs), writes it to the store, and reuses `_do_submit()` for the Grain handoff. Mirrors the run→submit packet path.
 - **Dependencies:** P30-T04, P30-T01
 
 ### P30-T06 — Real MCP code_review tool + integration tests
-- **Status:** draft
-- **Description:** Expose code_review over /mcp/call (inputs: repo/diff refs, task_id, verification_id) wired to the runner. Integration tests: fixture repo + mocked LLM, schema-valid packet, verdict-to-outcome mapping, verification_id passthrough, both approved and needs_fix.
+- **Status:** done
+- **Description:** `code_review` tool added to the MCP surface (`/mcp/call` + manifest + committed `tool_manifest.json`), X-Assay-Key auth like the other tools, inputs {repo, base, head, diff, task_id, verification_id} → injectable/fake LLM client → returns {verdict, outcome, verification_id, status}. Integration tests in `tests/test_review_bridge.py`: fixture git repo + fake LLM, schema-valid packet, verdict→outcome mapping, verification_id passthrough, `_do_submit` copy, and the MCP tool over `/mcp/call` — both approved and needs_fix.
 - **Dependencies:** P30-T05
 
 ## Backlog Maintenance Rules

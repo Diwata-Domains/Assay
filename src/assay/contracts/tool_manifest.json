@@ -53,6 +53,44 @@
       }
     },
     {
+      "name": "code_review",
+      "description": "Run adversarial / multi-agent AI CODE REVIEW over a diff (NOT a URL). Drives the proposer/critic/judge runner, maps the verdict to a packet outcome (approved->pass, needs_fix->fail, inconclusive), persists a schema-valid packet, and returns {verdict, outcome, verification_id, status}. Provide a pre-gathered 'diff', or 'repo' + 'base'/'head' git refs.",
+      "http": {
+        "method": "POST",
+        "path": "/mcp/call",
+        "tool": "code_review"
+      },
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Path to the git repo (default '.')."
+          },
+          "base": {
+            "type": "string",
+            "description": "Base git ref of the diff to review."
+          },
+          "head": {
+            "type": "string",
+            "description": "Head git ref of the diff to review."
+          },
+          "diff": {
+            "type": "string",
+            "description": "Pre-gathered unified diff text (alternative to base/head)."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Grain TASK-#### this review verifies. Optional."
+          },
+          "verification_id": {
+            "type": "string",
+            "description": "Grain-issued VERIFY-XXXX-NNN ID. Generated if omitted."
+          }
+        }
+      }
+    },
+    {
       "name": "get_report",
       "description": "Fetch the structured report for a verification_id from the store: outcome, summary, diff stats, artifact paths, baseline/review status.",
       "http": {

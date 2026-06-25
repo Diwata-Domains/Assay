@@ -18,6 +18,20 @@ Phase 28 — Release v0.3.0 + Documentation Reconciliation
 > shipped, baselines are managed headlessly via `assay baseline …` and `/baselines*`, and the
 > agent path is documented in README/AGENTS. See `docs/working/backlog.md` → "Phase 29".
 
+> **Phase 30 — Adversarial AI Code Review: ✓ IMPLEMENTED (2026-06-25).** The new code_review
+> verification MODE is bridge-callable end-to-end: `src/assay/review/` holds the verdict
+> contract + multi-agent (proposer/critic/judge) runner + non-URL diff input; `assay review
+> --repo --base --head --task-id --verification-id [--submit] [--format json]` and the MCP
+> `code_review` tool (`/mcp/call`, X-Assay-Key) both drive the runner via
+> `service.run_code_review`, map the verdict to a packet outcome (approved→pass,
+> needs_fix→fail), emit a schema-valid packet (verification_id passthrough), persist it, and
+> reuse `_do_submit` for the Grain handoff. Covered by `tests/test_review_bridge.py` (fixture
+> repo + fake LLM, both verdicts). **Still open:** P30-T01 — the Grain-side `grain verify
+> ingest` command does not exist (CP-002), so the verdict file lands in the Grain inbox but the
+> agent-to-agent loop is not yet closed; and CP-005 (the `review` block + `code_review`
+> issue_type schema change) is pending human approval, so packets currently reuse
+> `issue_type=bug_finding`. See `docs/working/backlog.md` → "Phase 30".
+
 All execution phases through Phase 27 are CLOSED and archived under `tasks/archive/phase-{N}/`.
 The Closed-Phase Ledger below is the authoritative one-line status of every closed phase;
 full task detail lives in the archive. This file names the focus; `docs/working/backlog.md`
