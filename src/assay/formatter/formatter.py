@@ -110,8 +110,8 @@ def format_review_packet(
     Mirrors the run -> format_packet -> submit packet path: the outcome comes from the verdict
     mapping (pass/fail/inconclusive), `verification_id` is passed through unchanged so the
     grain-issued VERIFY-XXXX-NNN survives, and the structured findings are folded into
-    `summary` + `artifact_refs`. Until CP-005 lands the packet reuses `issue_type=bug_finding`
-    so it stays valid against the FROZEN assay_payload.schema.json.
+    `summary` + `artifact_refs`. Since CP-005 landed the packet uses `issue_type=code_review`
+    and surfaces the structured verdict in the optional `review` block.
 
     The verdict -> outcome contract and the schema-safe field shaping live in
     `assay.review.verdict.format_review_packet`; this is the formatter-package entry point the

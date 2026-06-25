@@ -18,7 +18,7 @@
     },
     "issue_type": {
       "type": "string",
-      "enum": ["test_failure", "bug_finding", "screenshot_evidence", "trace_capture", "human_annotation"],
+      "enum": ["test_failure", "bug_finding", "screenshot_evidence", "trace_capture", "human_annotation", "code_review"],
       "description": "Category of the verification finding."
     },
     "severity": {
@@ -71,6 +71,31 @@
         "total_pixels": { "type": "integer" },
         "diff_pct": { "type": "number" },
         "diff_image_path": { "type": "string" }
+      }
+    },
+    "review": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["verdict"],
+      "description": "Structured code-review verdict block, populated when issue_type is code_review.",
+      "properties": {
+        "verdict": { "type": "string", "enum": ["pass", "fail", "inconclusive"] },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "severity", "message"],
+            "properties": {
+              "file": { "type": "string", "minLength": 1 },
+              "line": { "type": ["integer", "null"] },
+              "severity": { "type": "string", "enum": ["info", "warning", "error", "critical"] },
+              "message": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "reviewers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     }
   }

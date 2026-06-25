@@ -2,7 +2,7 @@
 
 Covers the verdict -> outcome -> grain-review mapping, the CodeReviewResult / CodeReviewFinding
 domain types (validation + round-trip), and that format_review_packet emits a packet that is
-valid against the FROZEN assay_payload.schema.json (issue_type reuses bug_finding until CP-005).
+valid against assay_payload.schema.json (issue_type code_review + the review block, per CP-005).
 """
 
 from __future__ import annotations
@@ -222,14 +222,20 @@ def test_packet_is_schema_valid_inconclusive() -> None:
     _validate(format_review_packet(_result(CodeReviewVerdict.INCONCLUSIVE)))
 
 
-def test_packet_issue_type_is_bug_finding_until_cp_lands() -> None:
+def test_packet_issue_type_is_code_review() -> None:
     packet = format_review_packet(_result())
-    assert packet["issue_type"] == "bug_finding"
+    assert packet["issue_type"] == "code_review"
 
 
-def test_packet_has_no_review_block_until_cp_lands() -> None:
-    packet = format_review_packet(_result())
-    assert "review" not in packet
+def test_packet_emits_review_block() -> None:
+    packet = format_review_packet(_result(CodeReviewVerdict.FAIL))
+    review = packet["review"]
+    assert isinstance(review, dict)
+    assert review["verdict"] == "fail"
+    assert review["reviewers"] == ["proposer", "critic", "judge"]
+    assert review["confidence"] == 0.8
+    assert isinstance(review["findings"], list)
+    assert review["findings"][0]["file"] == "src/x.py"  # type: ignore[index]
 
 
 def test_packet_outcome_tracks_verdict() -> None:

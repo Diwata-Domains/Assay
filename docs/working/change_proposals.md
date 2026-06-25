@@ -285,7 +285,7 @@ Project owner — approve, reject, or amend. On approval, apply the edits direct
 
 ## CP-005 — Add `code_review` issue_type + optional `review` block to the Assay payload contract
 
-**Status:** proposed (2026-06-25)
+**Status:** applied (2026-06-25)
 **Proposed by:** Phase 30 — Adversarial AI Code Review (P30-T02)
 **Affects:** `docs/canonical/data_contracts.md` §1, `src/assay/schemas/assay_payload.schema.json`
 **Requires:** human approval per canonical-doc rule (`CLAUDE.md` §Canonical Docs)
