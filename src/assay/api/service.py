@@ -208,6 +208,93 @@ def _diff_against_baseline(
     return info, diff_result.diff_pct > threshold
 
 
+def _default_review_client(model: str) -> object:
+    """Construct the opt-in Anthropic-backed review client (lazy; injected in tests)."""
+    from assay.review.client import DEFAULT_MODEL, AnthropicLLMClient
+
+    return AnthropicLLMClient(model=model or DEFAULT_MODEL)
+
+
+def run_code_review(
+    *,
+    repo: str = ".",
+    base: Optional[str] = None,
+    head: Optional[str] = None,
+    changed_files: Optional[list[str]] = None,
+    diff: Optional[str] = None,
+    output_dir: str = "./assay-output/review",
+    store_db: str,
+    task_id: Optional[str] = None,
+    verification_id: Optional[str] = None,
+    model: str = "",
+    agent_count: int = 2,
+    needs_fix_threshold: int = 1,
+    client: Optional[object] = None,
+) -> dict[str, object]:
+    """Run the adversarial code-review mode and persist a schema-valid packet.
+
+    Mirrors `run_verification`'s run -> format -> persist path for a non-URL (diff) input:
+    drive the multi-agent runner, map the verdict to a packet `outcome`, fold findings +
+    transcripts into the packet, write it to disk and the store. `verification_id` is passed
+    through unchanged. The LLM `client` is injected so tests pass a fake and the real Anthropic
+    client (opt-in extra) is constructed lazily only in production.
+
+    Returns the report shape: ``verification_id``, ``verdict``, ``outcome``,
+    ``grain_review``, ``packet_path``, ``task_id``, ``summary``, ``artifact_refs``,
+    ``findings_count``.
+    """
+    from assay.review.client import LLMClientError
+    from assay.review.diff import DiffGatherError
+    from assay.review.runner import ReviewerConfig, run_review
+    from assay.review.verdict import format_review_packet
+
+    review_client = client if client is not None else _default_review_client(model)
+    cfg = ReviewerConfig(
+        agent_count=agent_count,
+        needs_fix_threshold=needs_fix_threshold,
+        model=model,
+    )
+    try:
+        result = run_review(
+            review_client,  # type: ignore[arg-type]
+            repo=repo,
+            base=base,
+            head=head,
+            changed_files=changed_files,
+            diff=diff,
+            config=cfg,
+            output_dir=output_dir,
+        )
+    except DiffGatherError as exc:
+        raise ServiceError(f"failed to gather diff for review: {exc}") from exc
+    except LLMClientError as exc:
+        raise ServiceError(str(exc)) from exc
+
+    packet = format_review_packet(result, task_id=task_id, verification_id=verification_id)
+    vid = str(packet["verification_id"])
+
+    packet_path = write_packet(packet, output_dir)
+    db_path = Path(store_db).expanduser()
+    _store.init_db(db_path)
+    try:
+        _store.insert_packet(packet, db_path)
+    except _store.StoreError as exc:
+        raise ServiceError(f"failed to persist packet: {exc}") from exc
+
+    refs = packet.get("artifact_refs", [])
+    return {
+        "verification_id": vid,
+        "verdict": result.verdict.value,
+        "outcome": result.outcome.value,
+        "grain_review": result.grain_review.value,
+        "packet_path": str(packet_path),
+        "task_id": task_id,
+        "summary": str(packet.get("summary", "")),
+        "artifact_refs": refs,
+        "findings_count": len(result.findings),
+    }
+
+
 def get_report(
     verification_id: str,
     *,

@@ -571,6 +571,76 @@ def submit(
 
 
 # ---------------------------------------------------------------------------
+# review — adversarial AI code review as a bridge-callable verification mode
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def review(
+    ctx: typer.Context,
+    repo: str = typer.Option(".", "--repo", help="Path to the git repo to review."),
+    base: Optional[str] = typer.Option(None, "--base", help="Base git ref of the diff to review."),  # noqa: UP007
+    head: Optional[str] = typer.Option(None, "--head", help="Head git ref of the diff to review."),  # noqa: UP007
+    task_id: Optional[str] = typer.Option(None, "--task-id", help="Grain TASK-#### this review verifies."),  # noqa: UP007
+    verification_id: Optional[str] = typer.Option(None, "--verification-id", help="Grain-issued VERIFY-XXXX-NNN ID."),  # noqa: UP007
+    submit: bool = typer.Option(False, "--submit", help="Submit the packet to the Grain output path after review."),
+    output: Optional[str] = typer.Option(None, "--output", help="Output directory for transcripts + packet."),  # noqa: UP007
+    format: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Run adversarial AI code review over a diff and emit a Grain-bound verdict packet.
+
+    Mirrors `assay run`: drive the multi-agent runner, format a schema-valid packet whose
+    `outcome` comes from the verdict (approved->pass, needs_fix->fail), write it to the store,
+    and (with --submit) hand it off to Grain via the same _do_submit path as run/submit.
+    """
+    import json as _json
+
+    from assay.api import service
+
+    json_mode = format == "json"
+    config: AssayConfig = ctx.obj
+    output_dir = output or f"{config.output.directory.rstrip('/')}/review"
+
+    try:
+        result = service.run_code_review(
+            repo=repo,
+            base=base,
+            head=head,
+            output_dir=output_dir,
+            store_db=config.store.db,
+            task_id=task_id,
+            verification_id=verification_id,
+            model=config.review.model,
+            agent_count=config.review.agent_count,
+            needs_fix_threshold=config.review.needs_fix_threshold,
+        )
+    except service.ServiceError as exc:
+        if json_mode:
+            typer.echo(_json.dumps({"outcome": "error", "error": str(exc)}))
+        else:
+            typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    packet_path = str(result["packet_path"])
+    if not json_mode:
+        typer.echo(f"verdict: {result['verdict']}  outcome: {result['outcome']}  review: {result['grain_review']}")
+        typer.echo(f"packet: {packet_path}")
+
+    if submit:
+        _do_submit(packet_path, config)
+
+    if json_mode:
+        typer.echo(_json.dumps(result))
+
+    outcome = str(result["outcome"])
+    if outcome == "pass":
+        raise typer.Exit(0)
+    if outcome == "fail":
+        raise typer.Exit(3)
+    raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
 # serve
 # ---------------------------------------------------------------------------
 

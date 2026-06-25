@@ -92,6 +92,36 @@ async def call_tool(
             )
             return {"result": result, "error": None}
 
+        if body.tool == "code_review":
+            base = inp.get("base")
+            head = inp.get("head")
+            diff = inp.get("diff")
+            if not diff and not (base and head):
+                return {
+                    "result": None,
+                    "error": "code_review requires 'diff' or both 'base' and 'head'",
+                }
+            logger.info("MCP code_review repo=%s base=%s head=%s", inp.get("repo", "."), base, head)
+            result = service.run_code_review(
+                repo=str(inp.get("repo", ".")),
+                base=str(base) if base else None,
+                head=str(head) if head else None,
+                diff=str(diff) if diff else None,
+                output_dir=f"{output_dir.rstrip('/')}/review",
+                store_db=store_db,
+                task_id=inp.get("task_id"),
+                verification_id=inp.get("verification_id"),
+            )
+            return {
+                "result": {
+                    "verdict": result["verdict"],
+                    "outcome": result["outcome"],
+                    "verification_id": result["verification_id"],
+                    "status": "complete",
+                },
+                "error": None,
+            }
+
         if body.tool == "get_report":
             vid = str(inp.get("verification_id", "")).strip()
             if not vid:

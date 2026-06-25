@@ -13,6 +13,7 @@ from assay.runner.artifacts import ArtifactBundle
 
 if TYPE_CHECKING:
     from assay.ingest.app import IngestPayload
+    from assay.review.verdict import CodeReviewResult
 
 _ISSUE_TYPE_MAP = {
     "pass": "test_failure",
@@ -95,6 +96,36 @@ def format_packet(
         ]
 
     return packet
+
+
+def format_review_packet(
+    result: "CodeReviewResult",
+    task_id: Optional[str] = None,  # noqa: UP007
+    verification_id: Optional[str] = None,  # noqa: UP007
+    artifact_refs: Optional[list[str]] = None,  # noqa: UP007
+    verified_at: Optional[str] = None,  # noqa: UP007
+) -> dict[str, object]:
+    """Convert a CodeReviewResult into a Grain Sentinel payload dict (Phase 30 code-review mode).
+
+    Mirrors the run -> format_packet -> submit packet path: the outcome comes from the verdict
+    mapping (pass/fail/inconclusive), `verification_id` is passed through unchanged so the
+    grain-issued VERIFY-XXXX-NNN survives, and the structured findings are folded into
+    `summary` + `artifact_refs`. Until CP-005 lands the packet reuses `issue_type=bug_finding`
+    so it stays valid against the FROZEN assay_payload.schema.json.
+
+    The verdict -> outcome contract and the schema-safe field shaping live in
+    `assay.review.verdict.format_review_packet`; this is the formatter-package entry point the
+    CLI and service call, keeping the code-review packet path next to format_packet.
+    """
+    from assay.review.verdict import format_review_packet as _format_review_packet
+
+    return _format_review_packet(
+        result,
+        task_id=task_id,
+        verification_id=verification_id,
+        artifact_refs=artifact_refs,
+        verified_at=verified_at,
+    )
 
 
 def format_sdk_packet(
