@@ -19,7 +19,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
-_KNOWN_SECTIONS = {"project", "runner", "output", "serve", "keys", "schedule", "grain", "store", "ci", "checks"}
+_KNOWN_SECTIONS = {
+    "project", "runner", "output", "serve", "keys", "schedule",
+    "grain", "store", "ci", "checks", "review",
+}
 
 
 class ConfigError(Exception):
@@ -99,6 +102,24 @@ class CiConfig:
 
 
 @dataclass
+class ReviewConfig:
+    """Config surface for the adversarial code-review verification mode (Phase 30).
+
+    `mode` is the multi-agent strategy; `repo`/`base`/`head` define the non-URL diff input;
+    `model`/`agent_count` size the reviewer pool; `needs_fix_threshold` is the minimum count of
+    error-or-critical findings at which the judge returns a `fail` verdict (needs_fix).
+    """
+
+    mode: str = "adversarial"
+    repo: str = "."
+    base: str = ""
+    head: str = ""
+    model: str = ""
+    agent_count: int = 2
+    needs_fix_threshold: int = 1
+
+
+@dataclass
 class AssayConfig:
     project: ProjectConfig = field(default_factory=ProjectConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
@@ -109,6 +130,7 @@ class AssayConfig:
     grain: GrainConfig = field(default_factory=GrainConfig)
     store: StoreConfig = field(default_factory=StoreConfig)
     ci: CiConfig = field(default_factory=CiConfig)
+    review: ReviewConfig = field(default_factory=ReviewConfig)
     checks: list[CheckConfig] = field(default_factory=list)
 
 
@@ -158,6 +180,7 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     grain = _section("grain")
     store = _section("store")
     ci = _section("ci")
+    review = _section("review")
 
     raw_checks = raw.get("checks", [])
     if not isinstance(raw_checks, list):
@@ -207,6 +230,17 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
     if not isinstance(raw_port, int):
         raise ConfigError(f"serve.port must be an integer, got {raw_port!r}")
 
+    raw_agent_count = review.get("agent_count", 2)
+    raw_needs_fix = review.get("needs_fix_threshold", 1)
+    if not isinstance(raw_agent_count, int) or isinstance(raw_agent_count, bool):
+        raise ConfigError(f"review.agent_count must be an integer, got {raw_agent_count!r}")
+    if not isinstance(raw_needs_fix, int) or isinstance(raw_needs_fix, bool):
+        raise ConfigError(f"review.needs_fix_threshold must be an integer, got {raw_needs_fix!r}")
+    if raw_agent_count < 1:
+        raise ConfigError(f"review.agent_count must be >= 1, got {raw_agent_count}")
+    if raw_needs_fix < 1:
+        raise ConfigError(f"review.needs_fix_threshold must be >= 1, got {raw_needs_fix}")
+
     return AssayConfig(
         project=ProjectConfig(name=str(proj.get("name", "assay"))),
         runner=RunnerConfig(
@@ -234,6 +268,15 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
             threshold=float(cast(float, ci.get("threshold", 0.1))),
             fail_on_regression=bool(ci.get("fail_on_regression", True)),
             comment=bool(ci.get("comment", True)),
+        ),
+        review=ReviewConfig(
+            mode=str(review.get("mode", "adversarial")),
+            repo=str(review.get("repo", ".")),
+            base=str(review.get("base", "")),
+            head=str(review.get("head", "")),
+            model=str(review.get("model", "")),
+            agent_count=raw_agent_count,
+            needs_fix_threshold=raw_needs_fix,
         ),
         checks=parsed_checks,
     )

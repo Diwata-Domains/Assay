@@ -280,3 +280,135 @@ surface; usage/subscription billing still deferred.
 
 Project owner — approve, reject, or amend. On approval, apply the edits directly to
 `docs/canonical/product_scope.md` and mark this proposal `applied`.
+
+---
+
+## CP-005 — Add `code_review` issue_type + optional `review` block to the Assay payload contract
+
+**Status:** proposed (2026-06-25)
+**Proposed by:** Phase 30 — Adversarial AI Code Review (P30-T02)
+**Affects:** `docs/canonical/data_contracts.md` §1, `src/assay/schemas/assay_payload.schema.json`
+**Requires:** human approval per canonical-doc rule (`CLAUDE.md` §Canonical Docs)
+**Cross-product note:** Grain's `_validate_ingest_payload`
+(`products/grain/src/grain/services/verification_service.py`) hard-codes the same `issue_type`
+enum. The new value below is non-ingestable on the Grain side until Grain's validator is
+extended in lockstep — so this CP must be approved and applied on **both** products together.
+
+---
+
+### Finding
+
+Phase 30 introduces adversarial / multi-agent AI **code review** as a new verification MODE
+(memory: `assay-vnext-adversarial-review`). Its verdict (`approved` / `needs_fix`) flows back
+to Grain as a packet `outcome` and populates `grain review`. The verdict carries structured
+findings (per-file/line severity + message) and reviewer/judge provenance that the current
+frozen payload schema has nowhere to put:
+
+- `issue_type` enum is `test_failure | bug_finding | screenshot_evidence | trace_capture |
+  human_annotation` — none of these names a code review.
+- The schema is `additionalProperties: false`, so a structured `review` block cannot be
+  attached without a schema edit.
+
+Until this CP lands, code_review packets stay schema-valid by reusing `issue_type:
+"bug_finding"` and folding findings into `summary` + `artifact_refs` (the runner persists the
+full findings list + transcripts as artifacts). The in-code `CodeReviewResult` domain type
+already carries the structured verdict; this CP only asks to surface it in the wire contract.
+
+---
+
+### Proposed changes
+
+**(a) `issue_type` enum — add `code_review`:**
+
+```
+issue_type: test_failure | bug_finding | screenshot_evidence | trace_capture
+          | human_annotation | code_review
+```
+
+Apply in BOTH:
+- `docs/canonical/data_contracts.md` §1 (Required fields block + the `issue_type` field rule).
+- `src/assay/schemas/assay_payload.schema.json` `properties.issue_type.enum`.
+- (lockstep) Grain `_validate_ingest_payload` allowed set + its error message.
+
+**(b) Optional `review` block** — additive, non-required, backward-compatible:
+
+```json
+{
+  "review": {
+    "verdict": "<enum: pass | fail | inconclusive>",
+    "findings": [
+      {
+        "file": "<string — repo-relative path>",
+        "line": "<integer — 1-based; 0 or null for file-level>",
+        "severity": "<enum: info | warning | error | critical>",
+        "message": "<string>"
+      }
+    ],
+    "reviewers": ["<string — reviewer/agent identifier, e.g. proposer, critic, judge>"],
+    "confidence": "<number — 0.0..1.0>"
+  }
+}
+```
+
+Schema fragment to add under `properties` (keeping `additionalProperties: false` at the top
+level — `review` becomes a known property):
+
+```json
+"review": {
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["verdict"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["pass", "fail", "inconclusive"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "severity", "message"],
+        "properties": {
+          "file": { "type": "string", "minLength": 1 },
+          "line": { "type": ["integer", "null"] },
+          "severity": { "type": "string", "enum": ["info", "warning", "error", "critical"] },
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "reviewers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}
+```
+
+---
+
+### Verdict → outcome mapping (records the intent; already implemented in code)
+
+| review.verdict | packet outcome | grain review verdict |
+|----------------|----------------|----------------------|
+| `pass`         | `pass`         | `approved`           |
+| `fail`         | `fail`         | `needs_fix`          |
+| `inconclusive` | `inconclusive` | `needs_human`        |
+
+This mapping is implemented in `src/assay/review/verdict.py` against the EXISTING schema and
+does not require this CP — the CP only governs the wire-level `code_review` issue_type and the
+`review` block.
+
+---
+
+### What does NOT change
+
+- All current required fields and their types are unchanged.
+- The `pass | fail | inconclusive` `outcome` enum is unchanged (the verdict reuses it).
+- The `severity` enum is unchanged (findings reuse `info | warning | error | critical`).
+- `additionalProperties: false` is preserved; `review` is added as a known optional property.
+- Until applied, code_review packets emit `issue_type: "bug_finding"` and omit `review`, so
+  they remain valid against the current frozen schema AND the current Grain validator.
+
+---
+
+### Decision needed from
+
+Project owner — approve, reject, or amend. On approval, apply the schema + `data_contracts.md`
+edits AND the lockstep Grain validator edit, flip `format_review_packet` to emit
+`issue_type: "code_review"` + the `review` block, and mark this proposal `applied`.
