@@ -87,6 +87,35 @@ Optional fields: `artifact_refs`, `followup_candidates`, `verified_at`
 
 ---
 
+## Agent / programmatic access
+
+A familiar (agent) drives Assay headlessly through **three surfaces** — the CLI, `POST /ingest`,
+and the MCP server. **Do NOT use the browser SDK** (`@diwata-labs/assay-sdk`): its `capture()`
+reads the live DOM and throws outside a browser, so it is the human/in-app path, not the agent path.
+
+The machine-readable contract (tools + JSON Schemas + endpoints) is the source of truth:
+- on disk: `src/assay/contracts/tool_manifest.json` (built from `src/assay/contracts/manifest.py`)
+- over HTTP: `GET /mcp/manifest`
+
+Surfaces:
+
+1. **CLI** — most complete. `--format json` on `run`, `check`, `schedule list`, `key create`,
+   `key list`, `baseline {list,set,approve,reject}`, and `init`. `assay init --non-interactive`
+   (alias `--yes`) never prompts/`getpass` — pass `--admin-email`/`--admin-password` or set
+   `ASSAY_ADMIN_EMAIL`/`ASSAY_ADMIN_PASSWORD`.
+2. **`POST /ingest`** — `X-Assay-Key` auth; body per `src/assay/schemas/sdk_ingest.schema.json`.
+3. **MCP** — `GET /mcp/tools`, `GET /mcp/manifest`, `POST /mcp/call` (all `X-Assay-Key`-authed,
+   engine-backed — no canned data). Tools: `run_verification`, `get_report`, `get_status`,
+   `list_runs`, `list_baselines`, `approve_baseline`, `reject_baseline`, `set_baseline`.
+
+Headless baselines are also exposed over API-key HTTP: `GET /baselines`,
+`POST /baselines/{set,approve,reject}`.
+
+The shared engine behind all three surfaces is `src/assay/api/service.py` (CLI/HTTP/MCP all
+call it, so behaviour is identical). See README "Agent / programmatic access" for examples.
+
+---
+
 ## Current State
 
 See `docs/working/current_focus.md` for the authoritative active phase. As of 2026-06-25:

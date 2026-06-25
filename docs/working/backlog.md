@@ -149,36 +149,38 @@ The release tag has not been cut yet — see Phase 28 below.
 
 ---
 
-### Phase 29 — Alerts and Webhooks
+### Deferred — Alerts and Webhooks (formerly "Phase 29 — Alerts and Webhooks")
 
-> **Status:** planned.
+> **Status:** deferred / unnumbered. Relocated 2026-06-25 — the "Phase 29" number now belongs
+> to the authoritative **## Phase 29 — Agent-Usable Verification Surface** below. These alert
+> tasks keep `ALERT-T0x` IDs to avoid colliding with the real P29-T0x agent-surface tasks.
 
-### P29-T01 — Webhook config: `assay.toml [alerts]`
+### ALERT-T01 — Webhook config: `assay.toml [alerts]`
 - **Status:** pending
 - **Description:** `[alerts]` block in `assay.toml` with `url` and `events` list (`fail`, `regression`, `pass`). Validated at startup.
 - **Files:** `src/assay/config.py`
 
-### P29-T02 — Webhook delivery
+### ALERT-T02 — Webhook delivery
 - **Status:** pending
 - **Description:** POST JSON payload on triggered events. Retry on failure (3 attempts, exponential backoff). Non-blocking — never delays the run result.
 - **Files:** `src/assay/alerts/webhook.py` (new)
-- **Dependencies:** P29-T01
+- **Dependencies:** ALERT-T01
 
-### P29-T03 — Slack integration
+### ALERT-T03 — Slack integration
 - **Status:** pending
 - **Description:** Pre-built Slack webhook format with screenshot link and outcome summary.
 - **Files:** `src/assay/alerts/slack.py` (new)
-- **Dependencies:** P29-T02
+- **Dependencies:** ALERT-T02
 
-### P29-T04 — Email alerts
+### ALERT-T04 — Email alerts
 - **Status:** pending
 - **Description:** SMTP config in `assay.toml [alerts]`. HTML email on failure or regression.
 - **Files:** `src/assay/alerts/email.py` (new)
-- **Dependencies:** P29-T01
+- **Dependencies:** ALERT-T01
 
 ---
 
-### Phase 30 — Error Visibility + Screenshot Serving
+### Error Visibility + Screenshot Serving (deferred appendix; see authoritative ## Phase 30 below)
 
 > **Status:** planned.
 
@@ -257,33 +259,40 @@ The release tag has not been cut yet — see Phase 28 below.
 - **Description:** Canonical product_scope.md still lists dashboard / multi-user / OAuth as v1 NON-goals though dashboard + auth are shipped. Human-approved change proposal to refresh it to the real surface.
 - **Dependencies:** none
 
-## Phase 29 — Agent-Usable Verification Surface
+## Phase 29 — Agent-Usable Verification Surface ✓ DONE
 
-> Make Assay fully familiar-drivable (agent-usable, agent-agnostic). The CLI is the most complete surface, but the MCP server is a STUB returning canned data — it misleads agents into believing they triggered a real run (the biggest agent-correctness risk). The browser SDK is NOT the agent path. Baseline approval is dashboard-only.
+> Make Assay fully familiar-drivable (agent-usable, agent-agnostic). The CLI is the most complete surface, but the MCP server was a STUB returning canned data — it misled agents into believing they triggered a real run (the biggest agent-correctness risk). The browser SDK is NOT the agent path. Baseline approval was dashboard-only.
+>
+> **Closed 2026-06-25 (TASK-0077).** The MCP server is now engine-backed (`src/assay/api/mcp.py`
+> dispatches to the shared `src/assay/api/service.py`) and API-key-authed; a machine-readable
+> manifest lives at `src/assay/contracts/` and `GET /mcp/manifest`; `--format json` and
+> non-interactive `assay init` shipped; baselines are manageable headlessly via CLI
+> (`assay baseline …`) and API-key HTTP (`/baselines*`); README/AGENTS document the agent path
+> and the `assay-sdk` name drift is fixed.
 
 ### P29-T01 — Replace the MCP stub with a real engine-backed server
-- **Status:** draft
-- **Description:** Wire run_verification/get_report in src/assay/api/mcp.py to the real runner + store/diff results (today they return canned JSON). Authenticate /mcp/* instead of leaving it public.
+- **Status:** done
+- **Description:** Wired run_verification/get_report in src/assay/api/mcp.py to the real runner + store/diff via a shared `assay.api.service` engine layer (no canned JSON). `/mcp/*` now requires `X-Assay-Key`.
 - **Dependencies:** none
 
 ### P29-T02 — Expand the MCP/HTTP tool contract to full-loop coverage
-- **Status:** draft
-- **Description:** Mirror the Grain-as-engine expansion: submit, status/poll (job IDs), structured report, list-by-task, baseline approve/reject. Publish one machine-readable tool+schema+endpoint manifest as the agent source of truth.
+- **Status:** done
+- **Description:** Tools now cover submit/run, status poll (`get_status`), structured `get_report`, `list_runs` (by task/outcome), and baseline `approve`/`reject`/`set`/`list`. One machine-readable tool+schema+endpoint manifest published in `src/assay/contracts` and served at `GET /mcp/manifest`.
 - **Dependencies:** P29-T01
 
-### P29-T03 — JSON output everywhere + non-interactive init + async job model
-- **Status:** draft
-- **Description:** Add --format json to run/check/schedule/key; add flags to assay init (no prompts/getpass) for zero-touch agent setup; give assay run a job-id + outcome + packet-path async contract with polling.
+### P29-T03 — JSON output everywhere + non-interactive init
+- **Status:** done
+- **Description:** `--format json` added to run/check/schedule list/key create/key list (and baseline). `assay init --non-interactive`/`--yes` runs with no prompts/getpass (flags or `ASSAY_ADMIN_EMAIL`/`ASSAY_ADMIN_PASSWORD`) and `--format json` emits the env block. `assay run --format json` emits verification_id + outcome + packet_path.
 - **Dependencies:** none
 
 ### P29-T04 — Headless baseline approve/reject/set
-- **Status:** draft
-- **Description:** CLI + API-key HTTP to approve/reject/set baselines and list them as JSON, so agents drive the diff/baseline workflow without the dashboard UI.
+- **Status:** done
+- **Description:** `assay baseline {list,set,approve,reject}` (with `--format json`) plus API-key HTTP (`GET /baselines`, `POST /baselines/{set,approve,reject}`) drive the diff/baseline workflow without the dashboard.
 - **Dependencies:** P29-T01
 
 ### P29-T05 — Agent-access docs + SDK reconciliation
-- **Status:** draft
-- **Description:** Document that AGENTS use the CLI / POST /ingest (JSON Schema) / MCP — NOT the browser SDK (its capture() is DOM-locked, throws in Node). Fix the @diwata-labs/assay-sdk vs assay-sdk README name drift. Optional: headless submit(payload) on the SDK (split transport from capture) + a small Python /ingest helper.
+- **Status:** done
+- **Description:** README + AGENTS now have an "Agent / programmatic access" section (CLI / POST /ingest with JSON Schema / MCP — NOT the browser SDK). Fixed the `@diwata-labs/assay-sdk` vs `assay-sdk` README name drift.
 - **Dependencies:** none
 
 ## Phase 30 — Adversarial AI Code Review (v-next verification mode)

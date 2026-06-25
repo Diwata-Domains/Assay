@@ -12,6 +12,12 @@ Phase 28 — Release v0.3.0 + Documentation Reconciliation
 > (multi-viewport polish, alerts/webhooks, error visibility, client access layer).
 > **Last released:** v0.2.0 (Phase 13 close).
 
+> **Phase 29 — Agent-Usable Verification Surface: ✓ DONE (2026-06-25, TASK-0077).** The MCP
+> server is engine-backed and API-key-authed, a machine-readable agent manifest is published
+> (`src/assay/contracts/`, `GET /mcp/manifest`), `--format json` + non-interactive `assay init`
+> shipped, baselines are managed headlessly via `assay baseline …` and `/baselines*`, and the
+> agent path is documented in README/AGENTS. See `docs/working/backlog.md` → "Phase 29".
+
 All execution phases through Phase 27 are CLOSED and archived under `tasks/archive/phase-{N}/`.
 The Closed-Phase Ledger below is the authoritative one-line status of every closed phase;
 full task detail lives in the archive. This file names the focus; `docs/working/backlog.md`
