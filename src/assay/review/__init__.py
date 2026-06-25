@@ -10,6 +10,14 @@ results. The multi-agent runner that produces a CodeReviewResult is built on top
 types (P30-T03+).
 """
 
+from assay.review.client import (
+    DEFAULT_MODEL,
+    AnthropicLLMClient,
+    LLMClient,
+    LLMClientError,
+)
+from assay.review.diff import DiffGatherError, gather_diff
+from assay.review.runner import ReviewerConfig, run_review
 from assay.review.verdict import (
     CodeReviewFinding,
     CodeReviewResult,
@@ -22,12 +30,20 @@ from assay.review.verdict import (
 )
 
 __all__ = [
+    "DEFAULT_MODEL",
+    "AnthropicLLMClient",
     "CodeReviewFinding",
     "CodeReviewResult",
     "CodeReviewVerdict",
+    "DiffGatherError",
     "GrainReviewVerdict",
+    "LLMClient",
+    "LLMClientError",
     "PacketOutcome",
+    "ReviewerConfig",
     "format_review_packet",
+    "gather_diff",
     "grain_review_for_outcome",
     "outcome_for_verdict",
+    "run_review",
 ]
