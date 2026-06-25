@@ -33,6 +33,7 @@ dependencies = [
 assay = "assay.cli.main:app"
 
 [project.optional-dependencies]
+review = ["anthropic>=0.40"]
 dev = [
     "anyio[trio]>=4.0",
     "httpx>=0.27",
