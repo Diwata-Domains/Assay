@@ -1,3 +1,12 @@
+## [0.3.2] — 2026-06-25
+
+### Chores
+- relock for assay vendored-warden dep change (warden out, starlette in)
+- sync visual-regression (dispatch-only, warden blocker noted) to main
+
+### Bug Fixes
+- vendor warden to make assay-kit pip-installable
+
 ## [0.3.1] — 2026-06-25
 
 ### Chores
