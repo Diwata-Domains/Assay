@@ -12,8 +12,14 @@ from typing import Any
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
-from warden import WardenConfig, WardenMiddleware, clear_session_cookie, issue_token, set_session_cookie
 
+from assay._vendor.warden import (
+    WardenConfig,
+    WardenMiddleware,
+    clear_session_cookie,
+    issue_token,
+    set_session_cookie,
+)
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
 from assay.keys.store import verify_key

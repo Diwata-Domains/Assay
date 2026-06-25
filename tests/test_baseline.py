@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from warden import WardenConfig, issue_token
 
+from assay._vendor.warden import WardenConfig, issue_token
 from assay.auth.admin import hash_password
 from assay.ingest.app import app as ingest_app
 from assay.store.db import (
