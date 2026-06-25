@@ -155,14 +155,18 @@ grain verify status --verification-id VERIFY-0001-001
 
 ## Browser SDK
 
+> The browser SDK is for **human/in-app capture from a real browser**. It is **not** the
+> agent path — its `capture()` reads the live DOM and throws outside a browser. Agents should
+> use the CLI, `POST /ingest`, or MCP (see [Agent / programmatic access](#agent--programmatic-access)).
+
 Install the TypeScript SDK in your web app:
 
 ```bash
-npm install assay-sdk
+npm install @diwata-labs/assay-sdk
 ```
 
 ```typescript
-import { AssaySDK } from "assay-sdk";
+import { AssaySDK } from "@diwata-labs/assay-sdk";
 
 const sdk = new AssaySDK({
   apiKey: "your-api-key",
@@ -174,6 +178,66 @@ await sdk.capture({ comment: "Optional human note" });
 ```
 
 The SDK captures the current viewport, serializes metadata, and POSTs to the ingest endpoint. Results appear in the dashboard immediately.
+
+---
+
+## Agent / programmatic access
+
+Assay is fully familiar-drivable: an agent can run the entire verification loop headlessly,
+with no browser and no dashboard. **Agents use the CLI, `POST /ingest`, or the MCP server —
+never the browser SDK** (its `capture()` is DOM-locked and throws in Node).
+
+The machine-readable contract — every tool, its JSON Schema, and the HTTP endpoints — lives at
+`src/assay/contracts/tool_manifest.json` and is served at `GET /mcp/manifest`. Treat that as
+the source of truth.
+
+### Three agent surfaces
+
+1. **CLI** — the most complete surface. Every agent-relevant command takes `--format json`:
+
+   ```bash
+   assay init --non-interactive --admin-email a@b.com --admin-password "$PW" --format json
+   assay run --target https://app.example.com --task-id TASK-0001 --format json
+   assay check --format json
+   assay key create --name agent --format json
+   assay baseline approve VERIFY-0001-001 --format json
+   assay baseline list --format json
+   ```
+
+   `assay init --non-interactive` (alias `--yes`) never prompts or reads a TTY — pass the
+   admin email/password as flags or via `ASSAY_ADMIN_EMAIL` / `ASSAY_ADMIN_PASSWORD` for
+   zero-touch setup.
+
+2. **`POST /ingest`** — submit a captured screenshot payload directly. Authenticated with the
+   `X-Assay-Key` header. The request body conforms to the JSON Schema
+   [`src/assay/schemas/sdk_ingest.schema.json`](src/assay/schemas/sdk_ingest.schema.json); the
+   stored result conforms to
+   [`src/assay/schemas/assay_payload.schema.json`](src/assay/schemas/assay_payload.schema.json).
+
+3. **MCP server** — `GET /mcp/tools`, `GET /mcp/manifest`, `POST /mcp/call`. All `/mcp/*` and
+   `/baselines*` routes require a valid API key (`X-Assay-Key`). The tools cover the full loop:
+
+   | tool | purpose |
+   |------|---------|
+   | `run_verification` | trigger a real run; returns `verification_id` + outcome + diff |
+   | `get_report` | structured report for a `verification_id` |
+   | `get_status` | poll a `verification_id` (`pending` / `complete`) |
+   | `list_runs` | list runs, filter by `task_id` / `outcome` |
+   | `list_baselines` | list set baselines |
+   | `approve_baseline` / `reject_baseline` / `set_baseline` | drive the baseline workflow |
+
+   ```bash
+   KEY=$(assay key create --name agent --format json | tail -1 | python -c 'import sys,json;print(json.load(sys.stdin)["key"])')
+
+   curl -s localhost:8000/mcp/call -H "X-Assay-Key: $KEY" \
+     -d '{"tool":"run_verification","input":{"target":"https://app.example.com"}}'
+
+   curl -s localhost:8000/mcp/call -H "X-Assay-Key: $KEY" \
+     -d '{"tool":"approve_baseline","input":{"verification_id":"VERIFY-0001-001"}}'
+   ```
+
+Baselines are also manageable headlessly over API-key HTTP: `GET /baselines`,
+`POST /baselines/set|approve|reject` (body `{"verification_id": "..."}`) — no dashboard needed.
 
 ---
 

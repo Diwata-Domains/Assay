@@ -22,7 +22,7 @@ app = FastAPI(title="Assay Ingest")
 app.add_middleware(
     WardenMiddleware,
     public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
-    public_prefixes=("/status/", "/mcp"),
+    public_prefixes=("/status/", "/mcp", "/baselines"),
 )
 
 # Overridable via app.state for tests
@@ -36,7 +36,7 @@ app.include_router(_mcp_router)
 
 
 @app.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, str]:
     return {"status": "ok", "service": "assay"}
 
 
@@ -724,6 +724,74 @@ async def verification_status(verification_id: str, request: Request) -> dict[st
         "task_id": str(packet.get("task_id") or ""),
         "summary": str(packet.get("summary", "")),
     }
+
+
+# ---------------------------------------------------------------------------
+# Agent baseline management — API-key authenticated, headless (no dashboard)
+# ---------------------------------------------------------------------------
+
+
+class BaselineRequest(BaseModel):
+    verification_id: str
+
+    @field_validator("verification_id")
+    @classmethod
+    def non_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("verification_id must be a non-empty string")
+        return v
+
+
+@app.get("/baselines")
+async def baselines_list(
+    request: Request,
+    _key: str = Depends(_require_api_key),
+) -> dict[str, object]:
+    from assay.api import service
+
+    return {"baselines": service.list_baselines(store_db=request.app.state.store_db)}
+
+
+@app.post("/baselines/set")
+async def baselines_set(
+    request: Request,
+    body: BaselineRequest,
+    _key: str = Depends(_require_api_key),
+) -> dict[str, object]:
+    from assay.api import service
+
+    try:
+        return service.set_baseline(body.verification_id, store_db=request.app.state.store_db)
+    except service.ServiceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/baselines/approve")
+async def baselines_approve(
+    request: Request,
+    body: BaselineRequest,
+    _key: str = Depends(_require_api_key),
+) -> dict[str, object]:
+    from assay.api import service
+
+    try:
+        return service.approve_baseline(body.verification_id, store_db=request.app.state.store_db)
+    except service.ServiceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/baselines/reject")
+async def baselines_reject(
+    request: Request,
+    body: BaselineRequest,
+    _key: str = Depends(_require_api_key),
+) -> dict[str, object]:
+    from assay.api import service
+
+    try:
+        return service.reject_baseline(body.verification_id, store_db=request.app.state.store_db)
+    except service.ServiceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 _KEYS_STYLE = (
