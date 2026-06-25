@@ -1,3 +1,9 @@
+## [0.3.1] — 2026-06-25
+
+### Chores
+- sync visual-regression workflow (dispatch-only) to main
+- add visual-regression workflow to main (enables manual capture + PR verify)
+
 ## [0.3.0] — 2026-06-25
 
 ### Documentation
