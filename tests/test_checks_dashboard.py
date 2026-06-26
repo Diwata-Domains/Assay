@@ -100,7 +100,7 @@ def test_checks_route_protected_without_auth(tmp_path: Path) -> None:
     c = TestClient(ingest_app, follow_redirects=False)
     resp = c.get("/checks")
     assert resp.status_code == 303
-    assert resp.headers["location"] == "/login"
+    assert resp.headers["location"].startswith("/login?next=")
 
 
 # ---------------------------------------------------------------------------
