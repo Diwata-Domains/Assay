@@ -61,17 +61,24 @@ runs:
     - name: Install assay-kit
       shell: bash
       run: |
+        python -m pip install --upgrade pip
         if [ -n "${{ inputs.assay-version }}" ]; then
-          pip install "assay-kit==${{ inputs.assay-version }}"
+          python -m pip install "assay-kit==${{ inputs.assay-version }}"
         else
-          pip install assay-kit
+          # Floor at the first self-contained build. A bare `assay-kit` can backtrack to a
+          # pre-0.3.2 release whose internal `warden` dep is unpublished (uninstallable).
+          python -m pip install "assay-kit>=0.3.2"
         fi
 
     - name: Install Playwright browser
       shell: bash
       run: |
-        npm install playwright@1.44.0
-        npx playwright install chromium --with-deps
+        # Install Playwright in an ISOLATED dir, NOT the consumer's repo root: a pnpm/yarn
+        # monorepo with `workspace:*` deps breaks `npm install` there (EUNSUPPORTEDPROTOCOL).
+        # `@latest` keeps OS-dep install working on current Ubuntu runners (1.44.0 fails on 24.04).
+        mkdir -p "$RUNNER_TEMP/assay-pw"
+        ( cd "$RUNNER_TEMP/assay-pw" && npm init -y >/dev/null 2>&1 && npm install playwright@latest && npx playwright install --with-deps chromium )
+        echo "NODE_PATH=$RUNNER_TEMP/assay-pw/node_modules" >> "$GITHUB_ENV"
 
     - name: Write assay.toml
       shell: bash
