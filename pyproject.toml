@@ -54,7 +54,12 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-assay = ["runner/runner_script.js"]
+assay = [
+    "runner/runner_script.js",
+    "ingest/static/dashboard/.gitkeep",
+    "ingest/static/dashboard/*",
+    "ingest/static/dashboard/**/*",
+]
 
 [tool.ruff]
 src = ["src"]

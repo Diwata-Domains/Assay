@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
 
 from assay._vendor.warden import (
@@ -37,8 +37,40 @@ app.state.output_dir = "./assay-output"
 app.state.store_db = "~/.assay/store.db"
 
 from assay.api.mcp import router as _mcp_router  # noqa: E402
+from assay.ingest.api import router as _dashboard_api_router  # noqa: E402
 
 app.include_router(_mcp_router)
+app.include_router(_dashboard_api_router)
+
+# Built SPA dashboard. Session-protected like every other non-public path (the
+# WardenMiddleware guards everything outside public_paths/public_prefixes, and
+# /dashboard is intentionally NOT in those lists). The frontend stage builds the
+# compiled app into this package dir; a placeholder index ships so the mount works
+# before the SPA exists.
+_DASHBOARD_DIR = Path(__file__).parent / "static" / "dashboard"
+_DASHBOARD_INDEX = _DASHBOARD_DIR / "index.html"
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard/", response_class=HTMLResponse)
+async def dashboard_spa_root() -> HTMLResponse:
+    if _DASHBOARD_INDEX.exists():
+        return HTMLResponse(_DASHBOARD_INDEX.read_text())
+    raise HTTPException(status_code=404, detail="dashboard not built")
+
+
+@app.get("/dashboard/{path:path}", response_model=None)
+async def dashboard_spa_assets(path: str) -> FileResponse | HTMLResponse:
+    candidate = (_DASHBOARD_DIR / path).resolve()
+    try:
+        candidate.relative_to(_DASHBOARD_DIR.resolve())
+    except ValueError:
+        raise HTTPException(status_code=404, detail="not found") from None
+    if candidate.is_file():
+        return FileResponse(str(candidate))
+    if _DASHBOARD_INDEX.exists():
+        return HTMLResponse(_DASHBOARD_INDEX.read_text())
+    raise HTTPException(status_code=404, detail="dashboard not built")
 
 
 @app.get("/health")
