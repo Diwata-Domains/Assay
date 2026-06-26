@@ -33,3 +33,27 @@ Agents write here; user reviews and escalates to the appropriate tracker.
 **Workaround:** Kept phase as "Phase 9" with "(complete)" suffix, which Grain can parse.
 
 **Suggested fix:** Add a recognized terminal state (e.g. `Phase: complete` or `Phase: done`) that Grain treats as a valid no-op stop, rather than an error.
+
+---
+
+## 2026-06-26 — TASK-0077 ID reused across two packets (dashboard SPA vs. P29 agent-surface)
+
+**Observed:** Opening the Phase 28 "Assay dashboard SPA" packet, the work order pinned the ID
+`TASK-0077`. But `TASK-0077` was already minted by the closed Phase 29 packet
+(`tasks/P29-agent-surface-TASK-0077/`), and the derived next-free ID is TASK-0078 (the
+`tasks/archive/` global max is TASK-0076; `current_task.md` already says "next is TASK-0078").
+So two distinct packets now carry `TASK-0077`.
+
+**Root cause:** The next-ID rule in `CLAUDE.md` derives from the **archive** max, but TASK-0077
+was consumed by a packet that is `done` yet still lives outside `tasks/archive/` (in
+`tasks/P29-agent-surface-TASK-0077/`), so the archive-max derivation does not see it. An ID can
+be live without being archived, and the counter misses it.
+
+**Workaround:** Kept the work order's `TASK-0077` for the dashboard packet but namespaced the
+directory as `tasks/P28-T05-TASK-0077/` so it does not overwrite the P29 packet; flagged the
+reuse in `task.md`, `results.md`, `current_task.md`, and this log.
+
+**Suggested fix:** Derive the next ID from the max across BOTH `tasks/archive/` and the live
+`tasks/` packets (not the archive alone), and have `grain task create` reject an ID that already
+exists in either location. Severity: medium (collision is contained by the dir namespacing, but
+the counter rule is demonstrably unsound for done-but-unarchived packets).

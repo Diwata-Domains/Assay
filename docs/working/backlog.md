@@ -259,6 +259,13 @@ The release tag has not been cut yet — see Phase 28 below.
 - **Description:** Canonical product_scope.md still lists dashboard / multi-user / OAuth as v1 NON-goals though dashboard + auth are shipped. Human-approved change proposal to refresh it to the real surface.
 - **Dependencies:** none
 
+### P28-T05 — Assay dashboard SPA (Ironvale)
+- **Status:** ready
+- **Description:** Replace the inline-HTML dashboard in `src/assay/ingest/app.py` (the `/`, `/packet/{id}` f-string HTML pages) with a React + Ironvale single-page app in `apps/assay-dashboard` (mirrors the `apps/diwa-web` Vite/React 19/ironvale/react-router/tanstack-query stack) backed by a session-authed JSON REST API. The API reuses the existing store logic and the same Warden session login as the HTML dashboard (NOT API-key, NOT in `public_prefixes`): `GET /api/packets` (list, filter by outcome/task_id, paginated), `GET /api/packets/{vid}` (detail with `has_baseline`/`has_candidate`/`has_diff`), `GET /api/packets/{vid}/{candidate,baseline,diff}.png` (FileResponse / 404), `POST /api/packets/{vid}/review` ({action: approve|reject|set-baseline} → review_status). The built SPA mounts at `/dashboard` + `/dashboard/assets/*` behind `WardenMiddleware` with an SPA index fallback; `/` redirects to `/dashboard`. Splits presentation from data access and is the precondition for the seeded dashboard work (P28-T02 viewport side-by-side, P30-T01 error panel, P31-T03 project filter).
+- **Files:** `apps/assay-dashboard/**` (new), `src/assay/ingest/api.py` (new) + `src/assay/ingest/app.py`, `tests/`, `tasks/P28-T05-TASK-0077/`
+- **Task packet:** `tasks/P28-T05-TASK-0077/` (TASK-0077 — see the ID-reuse note in `current_task.md` / `tooling_notes.md`)
+- **Dependencies:** none
+
 ## Phase 29 — Agent-Usable Verification Surface ✓ DONE
 
 > Make Assay fully familiar-drivable (agent-usable, agent-agnostic). The CLI is the most complete surface, but the MCP server was a STUB returning canned data — it misled agents into believing they triggered a real run (the biggest agent-correctness risk). The browser SDK is NOT the agent path. Baseline approval was dashboard-only.
