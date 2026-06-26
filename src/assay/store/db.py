@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 _DEFAULT_DB = Path.home() / ".assay" / "store.db"
 
@@ -146,6 +146,94 @@ def list_packets(
     except sqlite3.Error as exc:
         raise StoreError(f"list failed: {exc}") from exc
     return [json.loads(row["raw"]) for row in rows]
+
+
+def count_packets(
+    db_path: Optional[Path] = None,  # noqa: UP007
+    outcome: Optional[str] = None,  # noqa: UP007
+    task_id: Optional[str] = None,  # noqa: UP007
+) -> int:
+    """Return the total packet count, optionally filtered by outcome or task_id."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return 0
+    clauses: list[str] = []
+    params: list[str] = []
+    if outcome:
+        clauses.append("outcome = ?")
+        params.append(outcome)
+    if task_id:
+        clauses.append("task_id = ?")
+        params.append(task_id)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    try:
+        with _connect(path) as conn:
+            row = conn.execute(
+                f"SELECT COUNT(*) AS n FROM packets {where}",
+                params,
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StoreError(f"count failed: {exc}") from exc
+    return int(row["n"]) if row is not None else 0
+
+
+def list_packets_page(
+    db_path: Optional[Path] = None,  # noqa: UP007
+    outcome: Optional[str] = None,  # noqa: UP007
+    task_id: Optional[str] = None,  # noqa: UP007
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict[str, object]]:
+    """Return a page of packets (newest first), filtered + paged at the SQL level.
+
+    Unlike :func:`list_packets`, this never materialises the full table — the
+    LIMIT/OFFSET is applied by SQLite so large stores stay cheap to page through.
+    """
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return []
+    clauses: list[str] = []
+    params: list[str] = []
+    if outcome:
+        clauses.append("outcome = ?")
+        params.append(outcome)
+    if task_id:
+        clauses.append("task_id = ?")
+        params.append(task_id)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    safe_limit = max(0, int(limit))
+    safe_offset = max(0, int(offset))
+    try:
+        with _connect(path) as conn:
+            rows = conn.execute(
+                f"SELECT raw FROM packets {where} "
+                "ORDER BY verified_at DESC, verification_id DESC LIMIT ? OFFSET ?",
+                [*params, safe_limit, safe_offset],
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list page failed: {exc}") from exc
+    return [json.loads(row["raw"]) for row in rows]
+
+
+def get_packet(
+    verification_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> Optional[dict[str, object]]:  # noqa: UP007
+    """Return a single packet by verification_id, or None if not found."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return None
+    try:
+        with _connect(path) as conn:
+            row = conn.execute(
+                "SELECT raw FROM packets WHERE verification_id = ?",
+                (verification_id,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StoreError(f"get_packet failed: {exc}") from exc
+    if row is None:
+        return None
+    return cast(dict[str, object], json.loads(row["raw"]))
 
 
 def import_packets(packets: list[dict[str, object]], db_path: Optional[Path] = None) -> int:  # noqa: UP007
