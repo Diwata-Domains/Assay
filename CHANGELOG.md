@@ -1,3 +1,37 @@
+## [0.3.3] — 2026-06-26
+
+### Bug Fixes
+- robust GitHub Action install (current Playwright, isolated dir, pinned floor)
+- install Assay from local checkout (published version lacks --no-docker)
+- use current Playwright (1.44.0 stale for Ubuntu 24.04 libasound2t64)
+- install Playwright in isolated tempdir (monorepo workspace:* breaks npm)
+- use python -m pip + fuller assay.toml in visual-regression capture
+- add skipLibCheck so vitest .d.ts types don't break apex/conclave build
+
+### Chores
+- set version to 0.3.2 (match published; merge mis-resolved to 0.3.1)
+- re-enable visual-regression PR verify + pin assay-kit==0.3.2 (now installable)
+- onboard Scry as its own workspace + create Phase 1 backlog packets; upgrade tooling
+- keep visual-regression dispatch-only (blocked: assay-kit warden dep not on PyPI)
+- pin assay-kit==0.3.1 (bare install backtracks to a flagless older build)
+- use published assay-kit + restore PR-verify trigger (0.3.1 has --no-docker)
+- make visual-regression dispatch-only until Assay runs in CI (non-breaking)
+- add committed-baseline visual regression (apex/conclave/sovereign)
+
+### Tests
+- add visual-regression baselines for apex/conclave/sovereign
+- scaffold Vitest + Testing Library for apex, conclave, sovereign
+
+### Documentation
+- backlog — Scry->Grain task-packet loop spec (ready to import into Grain)
+
+### Features
+- canary health-check (mirror) + LinkedIn profile health default
+- wire grain-assay frontend gate + reusable Assay verify workflow
+- health/run-log (drift detection) + LinkedIn selectors/login-wall/pipeline
+- interactive user-triggered session-capture tool
+- private LinkedIn AuthenticatedFetcher adapter (Layer 3 moat)
+
 ## [0.3.2] — 2026-06-25
 
 ### Chores
