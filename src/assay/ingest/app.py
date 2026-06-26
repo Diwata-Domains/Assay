@@ -6,10 +6,11 @@
 from __future__ import annotations
 
 import base64
+import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -17,18 +18,23 @@ from assay._vendor.warden import (
     WardenConfig,
     WardenMiddleware,
     clear_session_cookie,
-    issue_token,
-    set_session_cookie,
 )
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
 from assay.keys.store import verify_key
+
+# Where unauthenticated requests are sent to authenticate. Defaults to the local
+# "/login" route for dev; in production the operator points this at Gate
+# (e.g. https://gate.diwata.domains/login) so auth is delegated for SSO across
+# all .diwata.domains products sharing the same WARDEN_SECRET + cookie domain.
+LOGIN_URL = os.environ.get("ASSAY_LOGIN_URL", "/login")
 
 app = FastAPI(title="Assay Ingest")
 app.add_middleware(
     WardenMiddleware,
     public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
     public_prefixes=("/status/", "/mcp", "/baselines"),
+    login_url=LOGIN_URL,
 )
 
 # Overridable via app.state for tests
@@ -171,78 +177,18 @@ async def ingest(
     return {"status": "accepted"}
 
 
-_LOGIN_STYLE = (
-    "body{font-family:monospace;background:#0d0d0d;color:#e0e0e0;"
-    "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
-    ".box{background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:2rem 2.5rem;width:320px}"
-    "h1{color:#fff;margin:0 0 1.5rem;font-size:1.2rem;border-bottom:1px solid #333;padding-bottom:.75rem}"
-    "label{display:block;font-size:.8rem;color:#999;margin-bottom:.25rem}"
-    "input{width:100%;box-sizing:border-box;background:#0d0d0d;border:1px solid #333;color:#e0e0e0;"
-    "padding:.5rem .6rem;border-radius:4px;font-family:monospace;font-size:.9rem;margin-bottom:1rem}"
-    "input:focus{outline:none;border-color:#555}"
-    "button{width:100%;background:#2a2a2a;border:1px solid #444;color:#e0e0e0;padding:.6rem;"
-    "border-radius:4px;font-family:monospace;font-size:.9rem;cursor:pointer}"
-    "button:hover{background:#333}"
-    ".error{color:#f44336;font-size:.8rem;margin-bottom:1rem}"
-)
-
-
-def _login_page(error: str = "", next_url: str = "") -> str:
-    error_html = f'<p class="error">{error}</p>' if error else ""
-    next_field = f"<input type='hidden' name='next' value='{next_url}'>" if next_url else ""
-    return (
-        "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
-        "<title>Assay — Login</title>"
-        f"<style>{_LOGIN_STYLE}</style></head><body>"
-        "<div class='box'><h1>Assay</h1>"
-        f"{error_html}"
-        "<form method='post' action='/login'>"
-        f"{next_field}"
-        "<label>Email</label><input type='email' name='email' required autofocus>"
-        "<label>Password</label><input type='password' name='password' required>"
-        "<button type='submit'>Sign in</button>"
-        "</form></div></body></html>"
-    )
-
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(next: str = Query(default="")) -> HTMLResponse:
-    return HTMLResponse(_login_page(next_url=next))
-
-
-@app.post("/login", response_model=None)
-async def login_submit(
-    email: str = Form(...),
-    password: str = Form(...),
-    next: str = Form(default=""),
-) -> HTMLResponse | RedirectResponse:
-    from assay.auth.admin import (
-        get_admin_email,
-        get_admin_password_hash,
-        verify_password,
-    )
-
-    try:
-        admin_email = get_admin_email()
-        admin_hash = get_admin_password_hash()
-    except RuntimeError:
-        msg = "Server misconfigured — ASSAY_ADMIN_* env vars not set."
-        return HTMLResponse(_login_page(msg, next_url=next), status_code=500)
-
-    if email.strip().lower() != admin_email.lower() or not verify_password(password, admin_hash):
-        return HTMLResponse(_login_page("Invalid email or password.", next_url=next), status_code=401)
-
-    cfg = WardenConfig.from_env()
-    token = issue_token(email.strip().lower(), cfg)
-    redirect_to = next.strip() or "/"
-    response: RedirectResponse = RedirectResponse(url=redirect_to, status_code=303)
-    set_session_cookie(response, token, cfg)
-    return response
+@app.get("/login")
+async def login_page() -> RedirectResponse:
+    # Assay delegates authentication to Gate (gate.diwata.domains) for SSO.
+    # It no longer hosts its own login form: redirect to the configured login URL.
+    return RedirectResponse(url=LOGIN_URL, status_code=303)
 
 
 @app.get("/logout")
 async def logout() -> RedirectResponse:
-    response: RedirectResponse = RedirectResponse(url="/login", status_code=303)
+    # Logout is central: clearing the shared .diwata.domains session cookie signs
+    # the user out of every product, then send them back to Gate's login.
+    response: RedirectResponse = RedirectResponse(url=LOGIN_URL, status_code=303)
     clear_session_cookie(response, WardenConfig.from_env())
     return response
 

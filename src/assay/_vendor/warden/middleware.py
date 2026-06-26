@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -87,5 +88,8 @@ class WardenMiddleware(BaseHTTPMiddleware):
 
     def _deny(self, request: Request) -> Response:
         if self._login_url:
-            return RedirectResponse(url=self._login_url, status_code=303)
+            next_param = quote(str(request.url), safe="")
+            sep = "&" if "?" in self._login_url else "?"
+            target = f"{self._login_url}{sep}next={next_param}"
+            return RedirectResponse(url=target, status_code=303)
         return JSONResponse({"detail": "not authenticated"}, status_code=401)

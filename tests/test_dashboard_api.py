@@ -110,7 +110,7 @@ def test_api_packets_requires_session(tmp_path: Path, monkeypatch: pytest.Monkey
     client = _unauth_client(tmp_path, monkeypatch)
     r = client.get("/api/packets")
     assert r.status_code == 303
-    assert r.headers["location"] == "/login"
+    assert r.headers["location"].startswith("/login?next=")
 
 
 def test_api_packet_detail_requires_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,7 +123,7 @@ def test_dashboard_requires_session(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     client = _unauth_client(tmp_path, monkeypatch)
     r = client.get("/dashboard")
     assert r.status_code == 303
-    assert r.headers["location"] == "/login"
+    assert r.headers["location"].startswith("/login?next=")
 
 
 def test_dashboard_assets_require_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

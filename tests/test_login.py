@@ -1,71 +1,68 @@
 from __future__ import annotations
 
+import importlib
+import sys
+
 import pytest
 from fastapi.testclient import TestClient
 
-from assay.auth.admin import hash_password
-from assay.ingest.app import app
-
-_EMAIL = "admin@example.com"
-_PASSWORD = "correcthorse"
 _SECRET = "x" * 32
+_GATE_LOGIN = "https://gate.diwata.domains/login"
+
+
+def _reload_app() -> object:
+    importlib.import_module("assay.ingest.app")
+    return importlib.reload(sys.modules["assay.ingest.app"])
 
 
 @pytest.fixture()
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("ASSAY_ADMIN_EMAIL", _EMAIL)
-    monkeypatch.setenv("ASSAY_ADMIN_PASSWORD_HASH", hash_password(_PASSWORD))
+def gate_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """App that delegates auth to Gate (ASSAY_LOGIN_URL set)."""
     monkeypatch.setenv("WARDEN_SECRET", _SECRET)
-    return TestClient(app, follow_redirects=False)
+    monkeypatch.setenv("ASSAY_LOGIN_URL", _GATE_LOGIN)
+    app_module = _reload_app()
+    try:
+        yield TestClient(app_module.app, follow_redirects=False)
+    finally:
+        monkeypatch.delenv("ASSAY_LOGIN_URL", raising=False)
+        _reload_app()
 
 
-def test_login_page_renders(client: TestClient) -> None:
-    r = client.get("/login")
-    assert r.status_code == 200
-    assert "Sign in" in r.text
-    assert "Assay" in r.text
+@pytest.fixture()
+def default_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """App with no ASSAY_LOGIN_URL — defaults to local /login route."""
+    monkeypatch.setenv("WARDEN_SECRET", _SECRET)
+    monkeypatch.delenv("ASSAY_LOGIN_URL", raising=False)
+    app_module = _reload_app()
+    try:
+        yield TestClient(app_module.app, follow_redirects=False)
+    finally:
+        _reload_app()
 
 
-def test_login_success_redirects_to_dashboard(client: TestClient) -> None:
-    r = client.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
+def test_login_redirects_to_gate(gate_client: TestClient) -> None:
+    r = gate_client.get("/login")
     assert r.status_code == 303
-    assert r.headers["location"] == "/"
-    assert "warden_session" in r.cookies
+    assert r.headers["location"] == _GATE_LOGIN
 
 
-def test_login_sets_httponly_cookie(client: TestClient) -> None:
-    r = client.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
-    set_cookie = r.headers.get("set-cookie", "")
-    assert "HttpOnly" in set_cookie
+def test_login_no_local_form_rendered(gate_client: TestClient) -> None:
+    r = gate_client.get("/login")
+    # Delegated login is a redirect, not an HTML form.
+    assert "<form" not in r.text
 
 
-def test_login_wrong_password(client: TestClient) -> None:
-    r = client.post("/login", data={"email": _EMAIL, "password": "wrongpassword"})
-    assert r.status_code == 401
-    assert "Invalid email or password" in r.text
-    assert "warden_session" not in r.cookies
-
-
-def test_login_wrong_email(client: TestClient) -> None:
-    r = client.post("/login", data={"email": "other@example.com", "password": _PASSWORD})
-    assert r.status_code == 401
-    assert "Invalid email or password" in r.text
-
-
-def test_logout_clears_cookie(client: TestClient) -> None:
-    login = client.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
-    session_cookie = login.cookies["warden_session"]
-    client.cookies.set("warden_session", session_cookie)
-    r = client.get("/logout")
+def test_login_default_url_is_local(default_client: TestClient) -> None:
+    r = default_client.get("/login")
     assert r.status_code == 303
     assert r.headers["location"] == "/login"
 
 
-def test_login_missing_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ASSAY_ADMIN_EMAIL", raising=False)
-    monkeypatch.delenv("ASSAY_ADMIN_PASSWORD_HASH", raising=False)
-    monkeypatch.delenv("WARDEN_SECRET", raising=False)
-    c = TestClient(app, follow_redirects=False)
-    r = c.post("/login", data={"email": _EMAIL, "password": _PASSWORD})
-    assert r.status_code == 500
-    assert "misconfigured" in r.text
+def test_logout_clears_cookie_and_redirects_to_gate(
+    gate_client: TestClient,
+) -> None:
+    r = gate_client.get("/logout")
+    assert r.status_code == 303
+    assert r.headers["location"] == _GATE_LOGIN
+    set_cookie = r.headers.get("set-cookie", "")
+    assert "warden_session=" in set_cookie
