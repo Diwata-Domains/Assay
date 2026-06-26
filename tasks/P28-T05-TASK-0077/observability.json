@@ -1,0 +1,15 @@
+{
+  "task_id": "TASK-0077",
+  "packet_dir": "tasks/P28-T05-TASK-0077",
+  "executor_identity": "",
+  "model_class": "",
+  "last_stage": "close",
+  "last_stage_at": "2026-06-26T14:03:41Z",
+  "last_workflow_action": "task_close",
+  "last_workflow_action_at": "2026-06-26T14:03:41Z",
+  "started_at": "2026-06-26T14:03:41Z",
+  "updated_at": "2026-06-26T14:03:41Z",
+  "stage_timestamps": {
+    "close_at": "2026-06-26T14:03:41Z"
+  }
+}

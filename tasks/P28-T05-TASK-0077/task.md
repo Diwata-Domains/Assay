@@ -2,7 +2,7 @@
 
 ## Metadata
 - **ID:** TASK-0077
-- **Status:** ready
+- **Status:** done
 - **Phase:** Phase 28 — Release v0.3.0 + Documentation Reconciliation
 - **Backlog:** P28-T05 — Assay dashboard SPA
 - **Packet Path:** tasks/P28-T05-TASK-0077/
