@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, field_validator, model_validator
 
 from assay._vendor.warden import (
@@ -28,13 +28,17 @@ from assay.keys.store import verify_key
 # (e.g. https://gate.diwata.domains/login) so auth is delegated for SSO across
 # all .diwata.domains products sharing the same WARDEN_SECRET + cookie domain.
 LOGIN_URL = os.environ.get("ASSAY_LOGIN_URL", "/login")
+# SSO is active only when ASSAY_LOGIN_URL points at an EXTERNAL auth service (Gate).
+# With the local "/login" default, delegating would self-redirect, so auth is treated
+# as "not configured": protected routes return 401 (never a loop) instead of redirecting.
+_SSO_ENABLED = LOGIN_URL.startswith(("http://", "https://"))
 
 app = FastAPI(title="Assay Ingest")
 app.add_middleware(
     WardenMiddleware,
     public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
     public_prefixes=("/status/", "/mcp", "/baselines"),
-    login_url=LOGIN_URL,
+    login_url=LOGIN_URL if _SSO_ENABLED else None,
 )
 
 # Overridable via app.state for tests
@@ -178,18 +182,24 @@ async def ingest(
 
 
 @app.get("/login")
-async def login_page() -> RedirectResponse:
-    # Assay delegates authentication to Gate (gate.diwata.domains) for SSO.
-    # It no longer hosts its own login form: redirect to the configured login URL.
-    return RedirectResponse(url=LOGIN_URL, status_code=303)
+async def login_page() -> Response:
+    # Assay delegates auth to Gate (gate.diwata.domains) for SSO when configured. When
+    # SSO is not configured (ASSAY_LOGIN_URL unset), do NOT self-redirect — return 503.
+    if _SSO_ENABLED:
+        return RedirectResponse(url=LOGIN_URL, status_code=303)
+    return JSONResponse(
+        {"detail": "Assay auth is not configured. Set ASSAY_LOGIN_URL to your Gate login URL."},
+        status_code=503,
+    )
 
 
 @app.get("/logout")
-async def logout() -> RedirectResponse:
-    # Logout is central: clearing the shared .diwata.domains session cookie signs
-    # the user out of every product, then send them back to Gate's login.
-    response: RedirectResponse = RedirectResponse(url=LOGIN_URL, status_code=303)
-    clear_session_cookie(response, WardenConfig.from_env())
+async def logout() -> Response:
+    # Logout is central: clearing the shared .diwata.domains session cookie signs the
+    # user out of every product, then send them back to Gate's login (or "/" if unset).
+    response: Response = RedirectResponse(url=LOGIN_URL if _SSO_ENABLED else "/", status_code=303)
+    if os.environ.get("WARDEN_SECRET", "").strip():
+        clear_session_cookie(response, WardenConfig.from_env())
     return response
 
 

@@ -52,10 +52,12 @@ def test_login_no_local_form_rendered(gate_client: TestClient) -> None:
     assert "<form" not in r.text
 
 
-def test_login_default_url_is_local(default_client: TestClient) -> None:
+def test_login_unconfigured_returns_503_not_loop(default_client: TestClient) -> None:
+    # With the local default (SSO not configured), /login must NOT self-redirect
+    # (that would be an infinite loop); it returns 503 instead.
     r = default_client.get("/login")
-    assert r.status_code == 303
-    assert r.headers["location"] == "/login"
+    assert r.status_code == 503
+    assert "ASSAY_LOGIN_URL" in r.json()["detail"]
 
 
 def test_logout_clears_cookie_and_redirects_to_gate(
