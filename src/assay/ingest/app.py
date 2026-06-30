@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import os
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,16 @@ app.add_middleware(
 app.state.key_store = "~/.assay/keys.json"
 app.state.output_dir = "./assay-output"
 app.state.store_db = "~/.assay/store.db"
+
+
+def _esc(value: object) -> str:
+    """HTML-escape a value before interpolating it into the inline dashboard markup.
+
+    The dashboard renders attacker-controllable packet fields (url, summary, task_id,
+    key labels) that arrive via POST /ingest, so every interpolated value must be escaped
+    to prevent stored XSS into the operator's authenticated session.
+    """
+    return html.escape(str(value), quote=True)
 
 from assay.api.mcp import router as _mcp_router  # noqa: E402
 from assay.ingest.api import router as _dashboard_api_router  # noqa: E402
@@ -261,13 +272,13 @@ async def dashboard(request: Request) -> HTMLResponse:
             baseline_badge = ' <span class="baseline-badge">baseline</span>' if vid in baseline_vids else ""
             rows += (
                 f"<tr>"
-                f'<td><a href="/packet/{vid}">{vid[:8]}…</a>{baseline_badge}</td>'
-                f'<td class="outcome-{outcome}">{outcome}</td>'
-                f"<td>{severity}</td>"
-                f"<td>{has_screenshot}</td>"
-                f"<td>{task_id}</td>"
-                f"<td>{verified_at}</td>"
-                f"<td>{summary}</td>"
+                f'<td><a href="/packet/{_esc(vid)}">{_esc(vid[:8])}…</a>{baseline_badge}</td>'
+                f'<td class="outcome-{_esc(outcome)}">{_esc(outcome)}</td>'
+                f"<td>{_esc(severity)}</td>"
+                f"<td>{_esc(has_screenshot)}</td>"
+                f"<td>{_esc(task_id)}</td>"
+                f"<td>{_esc(verified_at)}</td>"
+                f"<td>{_esc(summary)}</td>"
                 f"</tr>"
             )
 
@@ -341,12 +352,12 @@ async def checks_dashboard(request: Request) -> HTMLResponse:
             ts = str(r.get("checked_at", ""))[:19]
             rows += (
                 f"<tr>"
-                f'<td>{r["check_id"]}</td>'
-                f'<td>{r["check_type"]}</td>'
-                f'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">{r["target"]}</td>'
+                f'<td>{_esc(r["check_id"])}</td>'
+                f'<td>{_esc(r["check_type"])}</td>'
+                f'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">{_esc(r["target"])}</td>'
                 f'<td class="outcome-{status_class}">{status}</td>'
-                f"<td>{detail}</td>"
-                f"<td>{ts}</td>"
+                f"<td>{_esc(detail)}</td>"
+                f"<td>{_esc(ts)}</td>"
                 f"</tr>"
             )
 
@@ -516,7 +527,7 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
             "<title>Not found — Assay</title>"
             "<style>body{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}"
             "a{color:#90caf9}</style></head>"
-            f"<body><h1>404 — packet not found</h1><p>{verification_id}</p>"
+            f"<body><h1>404 — packet not found</h1><p>{_esc(verification_id)}</p>"
             "<p><a href='/'>← back to dashboard</a></p></body></html>"
         )
         return HTMLResponse(content=html_404, status_code=404)
@@ -526,7 +537,7 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
     for key, val in packet.items():
         if key in skip:
             continue
-        fields_html += f"<dt>{key}</dt><dd>{val}</dd>"
+        fields_html += f"<dt>{_esc(key)}</dt><dd>{_esc(val)}</dd>"
 
     refs = packet.get("artifact_refs", [])
     ref_list = refs if isinstance(refs, list) else []
@@ -612,7 +623,7 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
         )
     else:
         baseline_action = (
-            f"<form method='post' action='/packet/{verification_id}/set-baseline' style='display:inline'>"
+            f"<form method='post' action='/packet/{_esc(verification_id)}/set-baseline' style='display:inline'>"
             "<button style='background:#1a2a1a;border:1px solid #2e7d32;color:#81c784;"
             "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
             "cursor:pointer'>Set as baseline</button></form>"
@@ -622,11 +633,13 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
     review_buttons = ""
     if has_diff and not is_baseline:
         review_buttons = (
-            f"<form method='post' action='/packet/{verification_id}/approve' style='display:inline;margin-left:.75rem'>"
+            f"<form method='post' action='/packet/{_esc(verification_id)}/approve' "
+            "style='display:inline;margin-left:.75rem'>"
             "<button style='background:#0a1a0a;border:1px solid #2e7d32;color:#81c784;"
             "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
             "cursor:pointer'>✓ Approve</button></form>"
-            f"<form method='post' action='/packet/{verification_id}/reject' style='display:inline;margin-left:.5rem'>"
+            f"<form method='post' action='/packet/{_esc(verification_id)}/reject' "
+            "style='display:inline;margin-left:.5rem'>"
             "<button style='background:#1a0a0a;border:1px solid #c62828;color:#ef9a9a;"
             "padding:.3rem .75rem;border-radius:4px;font-family:monospace;font-size:.85rem;"
             "cursor:pointer'>✗ Reject</button></form>"
@@ -648,7 +661,7 @@ async def packet_detail(verification_id: str, request: Request) -> HTMLResponse:
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Packet {verification_id[:8]} — Assay</title>
+<title>Packet {_esc(verification_id[:8])} — Assay</title>
 <style>
 body{{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}}
 h1,h2{{color:#fff;border-bottom:1px solid #333;padding-bottom:.4rem}}
@@ -662,13 +675,13 @@ a:hover{{text-decoration:underline}}
 </head>
 <body>
 <p><a href="/">← dashboard</a></p>
-<h1>Packet {verification_id[:8]}…{review_badge}</h1>
+<h1>Packet {_esc(verification_id[:8])}…{review_badge}</h1>
 <p>{baseline_action}{review_buttons}</p>
 <dl>{fields_html}</dl>
 {screenshot_html}
 {diff_html}
 <h2>Raw</h2>
-<pre>{raw_pretty}</pre>
+<pre>{_esc(raw_pretty)}</pre>
 </body>
 </html>"""
     return HTMLResponse(content=html)
@@ -845,8 +858,9 @@ def _keys_page(
     if new_key:
         new_key_html = (
             "<div class='new-key'>"
-            f"<div class='label'>New key for <strong>{new_label}</strong> — copy it now, it won't be shown again</div>"
-            f"<code>{new_key}</code>"
+            f"<div class='label'>New key for <strong>{_esc(new_label)}</strong> "
+            "— copy it now, it won't be shown again</div>"
+            f"<code>{_esc(new_key)}</code>"
             "</div>"
         )
 
@@ -861,10 +875,10 @@ def _keys_page(
             created = str(k["created_at"])[:10]
             rows += (
                 f"<tr>"
-                f"<td>{label}</td>"
-                f"<td>{created}</td>"
+                f"<td>{_esc(label)}</td>"
+                f"<td>{_esc(created)}</td>"
                 f"<td>"
-                f"<form class='inline' method='post' action='/keys/{kid}/revoke'>"
+                f"<form class='inline' method='post' action='/keys/{_esc(kid)}/revoke'>"
                 f"<button class='danger' type='submit'>Revoke</button>"
                 f"</form>"
                 f"</td>"
