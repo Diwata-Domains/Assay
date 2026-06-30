@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -34,6 +35,25 @@ LOGIN_URL = os.environ.get("ASSAY_LOGIN_URL", "/login")
 _SSO_ENABLED = LOGIN_URL.startswith(("http://", "https://"))
 
 app = FastAPI(title="Assay Ingest")
+
+# Browser callers (e.g. a CRM at crm.example.com) hit POST /ingest with the custom
+# X-Assay-Key header, which triggers a CORS preflight. Without CORS handling the app 405s
+# the OPTIONS preflight and the browser blocks the real POST. Origins are env-configurable
+# (comma-separated) so staging/other CRMs can be added without a code change.
+_CORS_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("ASSAY_CORS_ORIGINS", "https://crm.example.com").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_CORS_ORIGINS,
+    allow_methods=["POST", "OPTIONS"],
+    allow_headers=["content-type", "x-assay-key"],
+    allow_credentials=False,
+    max_age=86400,
+)
+
 app.add_middleware(
     WardenMiddleware,
     public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
