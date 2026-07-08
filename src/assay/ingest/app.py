@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import html
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,8 @@ LOGIN_URL = os.environ.get("ASSAY_LOGIN_URL", "/login")
 # With the local "/login" default, delegating would self-redirect, so auth is treated
 # as "not configured": protected routes return 401 (never a loop) instead of redirecting.
 _SSO_ENABLED = LOGIN_URL.startswith(("http://", "https://"))
+
+logger = logging.getLogger("assay.ingest")
 
 app = FastAPI(title="Assay Ingest")
 
@@ -228,7 +231,11 @@ async def ingest(
         try:
             set_triage_status(verification_id, "new", Path(request.app.state.store_db).expanduser())
         except StoreError:
-            pass
+            logger.warning(
+                "triage inbox insert failed for verification_id=%s; packet stored but "
+                "did not enter the triage inbox",
+                verification_id,
+            )
     return {"status": "accepted"}
 
 

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from assay.ingest.app import app
 from assay.keys.store import create_key
-from assay.store.db import get_packet, list_packets_page
+from assay.store.db import StoreError, get_packet, list_packets_page
 
 # `assay.ingest.__init__` does `from assay.ingest.app import app`, which rebinds the
 # `app` attribute on the `assay.ingest` package from the submodule to the FastAPI
@@ -118,3 +119,31 @@ def test_passing_verification_does_not_enter_inbox(tmp_path: Path, monkeypatch: 
     packet = _get_packet(vid, app.state.store_db)
     assert packet["kind"] == "verification"
     assert packet["triage_status"] is None
+
+
+def test_triage_status_failure_is_logged_and_still_200(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A StoreError from set_triage_status must not break the always-200 /ingest
+    contract, but it must leave a trace — otherwise a capture silently never enters
+    the triage inbox with zero operator-visible signal."""
+    client, key = _client(tmp_path, monkeypatch)
+
+    def fake_set_triage_status(*args: object, **kwargs: object) -> None:
+        raise StoreError("db is locked")
+
+    import assay.store.db as store_db_module
+
+    monkeypatch.setattr(store_db_module, "set_triage_status", fake_set_triage_status)
+
+    with caplog.at_level(logging.WARNING, logger="assay.ingest"):
+        r = client.post("/ingest", json=_payload(kind="report"), headers={"X-Assay-Key": key})
+
+    assert r.status_code == 200
+    assert r.json() == {"status": "accepted"}
+
+    vid = _only_vid(app.state.store_db)
+    assert any(
+        record.levelno == logging.WARNING and vid in record.getMessage()
+        for record in caplog.records
+    ), caplog.text
