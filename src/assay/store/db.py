@@ -77,6 +77,14 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
             conn.execute("ALTER TABLE packets ADD COLUMN review_status TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE packets ADD COLUMN triage_status TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE packets ADD COLUMN priority TEXT")
+        except sqlite3.OperationalError:
+            pass
     return path
 
 
@@ -152,8 +160,9 @@ def count_packets(
     db_path: Optional[Path] = None,  # noqa: UP007
     outcome: Optional[str] = None,  # noqa: UP007
     task_id: Optional[str] = None,  # noqa: UP007
+    triage_status: Optional[str] = None,  # noqa: UP007
 ) -> int:
-    """Return the total packet count, optionally filtered by outcome or task_id."""
+    """Return the total packet count, optionally filtered by outcome, task_id, or triage_status."""
     path = db_path or _DEFAULT_DB
     if not path.exists():
         return 0
@@ -165,6 +174,9 @@ def count_packets(
     if task_id:
         clauses.append("task_id = ?")
         params.append(task_id)
+    if triage_status:
+        clauses.append("triage_status = ?")
+        params.append(triage_status)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     try:
         with _connect(path) as conn:
@@ -181,6 +193,7 @@ def list_packets_page(
     db_path: Optional[Path] = None,  # noqa: UP007
     outcome: Optional[str] = None,  # noqa: UP007
     task_id: Optional[str] = None,  # noqa: UP007
+    triage_status: Optional[str] = None,  # noqa: UP007
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, object]]:
@@ -200,19 +213,36 @@ def list_packets_page(
     if task_id:
         clauses.append("task_id = ?")
         params.append(task_id)
+    if triage_status:
+        clauses.append("triage_status = ?")
+        params.append(triage_status)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     safe_limit = max(0, int(limit))
     safe_offset = max(0, int(offset))
     try:
         with _connect(path) as conn:
             rows = conn.execute(
-                f"SELECT raw FROM packets {where} "
+                f"SELECT raw, severity, triage_status, priority FROM packets {where} "
                 "ORDER BY verified_at DESC, verification_id DESC LIMIT ? OFFSET ?",
                 [*params, safe_limit, safe_offset],
             ).fetchall()
     except sqlite3.Error as exc:
         raise StoreError(f"list page failed: {exc}") from exc
-    return [json.loads(row["raw"]) for row in rows]
+    return [_row_to_packet(row) for row in rows]
+
+
+def _row_to_packet(row: sqlite3.Row) -> dict[str, object]:
+    """Parse a packet's raw JSON and overlay the mutable triage columns.
+
+    ``severity``/``triage_status``/``priority`` are updated in-place via the
+    setters below without rewriting ``raw``, so the row's live column values
+    take precedence over whatever was captured in ``raw`` at insert time.
+    """
+    packet = cast(dict[str, object], json.loads(row["raw"]))
+    packet["severity"] = row["severity"]
+    packet["triage_status"] = row["triage_status"]
+    packet["priority"] = row["priority"]
+    return packet
 
 
 def get_packet(
@@ -226,14 +256,14 @@ def get_packet(
     try:
         with _connect(path) as conn:
             row = conn.execute(
-                "SELECT raw FROM packets WHERE verification_id = ?",
+                "SELECT raw, severity, triage_status, priority FROM packets WHERE verification_id = ?",
                 (verification_id,),
             ).fetchone()
     except sqlite3.Error as exc:
         raise StoreError(f"get_packet failed: {exc}") from exc
     if row is None:
         return None
-    return cast(dict[str, object], json.loads(row["raw"]))
+    return _row_to_packet(row)
 
 
 def import_packets(packets: list[dict[str, object]], db_path: Optional[Path] = None) -> int:  # noqa: UP007
@@ -377,3 +407,56 @@ def set_review_status(
             )
     except sqlite3.Error as exc:
         raise StoreError(f"set_review_status failed: {exc}") from exc
+
+
+def _set_column(
+    verification_id: str,
+    column: str,
+    value: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Update a single triage column by verification_id. Raises StoreError if not found.
+
+    ``column`` is interpolated into the SQL string, which is only safe because
+    it is always one of the fixed literals passed by the setters below —
+    never caller-supplied. The value and verification_id are always bound as
+    parameters.
+    """
+    path = db_path or _DEFAULT_DB
+    try:
+        with _connect(path) as conn:
+            cur = conn.execute(
+                f"UPDATE packets SET {column} = ? WHERE verification_id = ?",
+                (value, verification_id),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"set_{column} failed: {exc}") from exc
+    if cur.rowcount == 0:
+        raise StoreError(f"packet {verification_id} not found")
+
+
+def set_triage_status(
+    verification_id: str,
+    status: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Set triage_status on a packet. Raises StoreError if not found."""
+    _set_column(verification_id, "triage_status", status, db_path)
+
+
+def set_severity(
+    verification_id: str,
+    severity: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Set severity on a packet. Raises StoreError if not found."""
+    _set_column(verification_id, "severity", severity, db_path)
+
+
+def set_priority(
+    verification_id: str,
+    priority: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Set priority on a packet. Raises StoreError if not found."""
+    _set_column(verification_id, "priority", priority, db_path)
