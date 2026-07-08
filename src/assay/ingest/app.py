@@ -139,6 +139,7 @@ class IngestPayload(BaseModel):
     user_comment: str | None = None
     task_id: str | None = None
     metadata: dict[str, Any] = {}
+    kind: str = "report"
 
     @field_validator("captured_at")
     @classmethod
@@ -170,6 +171,13 @@ class IngestPayload(BaseModel):
             base64.b64decode(v, validate=True)
         except Exception as exc:
             raise ValueError("screenshot must be valid base64") from exc
+        return v
+
+    @field_validator("kind")
+    @classmethod
+    def valid_kind(cls, v: str) -> str:
+        if v not in ("report", "verification"):
+            raise ValueError('kind must be "report" or "verification"')
         return v
 
 
@@ -208,7 +216,19 @@ async def ingest(
     packet["artifact_refs"] = [screenshot_path]
     _attach_diff(packet, payload.url, screenshot_path, output_dir, request.app.state.store_db)
     write_packet(packet, output_dir)
+    # `kind` is Assay-internal triage metadata, not part of the canonical Grain Sentinel
+    # payload schema (assay_payload.schema.json) that write_packet's file must satisfy, so
+    # it's added to the in-memory packet only after write_packet — but still before
+    # _store_ingest_packet so it persists in the stored packet's `raw` JSON.
+    packet["kind"] = payload.kind
     _store_ingest_packet(packet, request.app.state.store_db)
+    if payload.kind == "report" or (payload.kind == "verification" and packet.get("outcome") == "fail"):
+        from assay.store.db import StoreError, set_triage_status
+
+        try:
+            set_triage_status(verification_id, "new", Path(request.app.state.store_db).expanduser())
+        except StoreError:
+            pass
     return {"status": "accepted"}
 
 

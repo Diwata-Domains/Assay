@@ -44,6 +44,12 @@
     "metadata": {
       "type": "object",
       "description": "Additional arbitrary metadata. Optional."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["report", "verification"],
+      "default": "report",
+      "description": "Capture kind — a user-filed report or an SDK verification run. Optional, defaults to \"report\"."
     }
   }
 }
