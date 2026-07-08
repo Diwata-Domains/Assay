@@ -12,6 +12,7 @@ from assay.store.db import (
     get_packet,
     init_db,
     insert_packet,
+    list_packets,
     list_packets_page,
     set_priority,
     set_severity,
@@ -19,12 +20,12 @@ from assay.store.db import (
 )
 
 
-def _packet(vid: str) -> dict[str, object]:
+def _packet(vid: str, severity: str = "") -> dict[str, object]:
     return {
         "verification_id": vid,
         "task_id": None,
         "issue_type": "report",
-        "severity": "",
+        "severity": severity,
         "outcome": "report",
         "summary": "s",
         "artifact_refs": [],
@@ -57,3 +58,18 @@ def test_filter_by_triage_status(tmp_path: Path) -> None:
     page = list_packets_page(db, triage_status="new")
     assert [p["verification_id"] for p in page] == ["v1"]
     assert count_packets(db, triage_status="new") == 1
+
+
+def test_setters_sync_raw_for_list_packets(tmp_path: Path) -> None:
+    """Regression: list_packets has no column overlay, so raw must be authoritative."""
+    db = tmp_path / "s.db"
+    init_db(db)
+    insert_packet(_packet("v1", severity="warn"), db)
+    set_severity("v1", "critical", db)
+    set_priority("v1", "high", db)
+    set_triage_status("v1", "promoted", db)
+    packets = list_packets(db)
+    p = next(p for p in packets if p["verification_id"] == "v1")
+    assert p["severity"] == "critical"
+    assert p["priority"] == "high"
+    assert p["triage_status"] == "promoted"

@@ -415,24 +415,29 @@ def _set_column(
     value: str,
     db_path: Optional[Path] = None,  # noqa: UP007
 ) -> None:
-    """Update a single triage column by verification_id. Raises StoreError if not found.
+    """Update a single triage column and its raw JSON. Raises StoreError if not found.
 
     ``column`` is interpolated into the SQL string, which is only safe because
     it is always one of the fixed literals passed by the setters below —
     never caller-supplied. The value and verification_id are always bound as
-    parameters.
+    parameters. Mirrors :func:`set_review_status`'s read/mutate/write of
+    ``raw`` so every consumer (including ``list_packets``, which has no
+    column overlay) sees the current value.
     """
     path = db_path or _DEFAULT_DB
+    packets = list_packets(path)
+    packet = next((p for p in packets if str(p.get("verification_id", "")) == verification_id), None)
+    if packet is None:
+        raise StoreError(f"packet {verification_id} not found")
+    packet[column] = value
     try:
         with _connect(path) as conn:
-            cur = conn.execute(
-                f"UPDATE packets SET {column} = ? WHERE verification_id = ?",
-                (value, verification_id),
+            conn.execute(
+                f"UPDATE packets SET {column} = ?, raw = ? WHERE verification_id = ?",
+                (value, json.dumps(packet), verification_id),
             )
     except sqlite3.Error as exc:
         raise StoreError(f"set_{column} failed: {exc}") from exc
-    if cur.rowcount == 0:
-        raise StoreError(f"packet {verification_id} not found")
 
 
 def set_triage_status(
