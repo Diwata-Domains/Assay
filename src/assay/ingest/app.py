@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, field_validator, model_validator
@@ -24,7 +24,7 @@ from assay._vendor.warden import (
 )
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
-from assay.keys.store import verify_key
+from assay.keys.require import _require_api_key
 
 # Where unauthenticated requests are sent to authenticate. Defaults to the local
 # "/login" route for dev; in production the operator points this at Gate
@@ -61,7 +61,7 @@ app.add_middleware(
 app.add_middleware(
     WardenMiddleware,
     public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
-    public_prefixes=("/status/", "/mcp", "/baselines"),
+    public_prefixes=("/status/", "/mcp", "/baselines", "/promotions"),
     login_url=LOGIN_URL if _SSO_ENABLED else None,
 )
 
@@ -82,9 +82,11 @@ def _esc(value: object) -> str:
 
 from assay.api.mcp import router as _mcp_router  # noqa: E402
 from assay.ingest.api import router as _dashboard_api_router  # noqa: E402
+from assay.promotions.api import router as _promotions_router  # noqa: E402
 
 app.include_router(_mcp_router)
 app.include_router(_dashboard_api_router)
+app.include_router(_promotions_router)
 
 # Built SPA dashboard. Session-protected like every other non-public path (the
 # WardenMiddleware guards everything outside public_paths/public_prefixes, and
@@ -182,15 +184,6 @@ class IngestPayload(BaseModel):
         if v not in ("report", "verification"):
             raise ValueError('kind must be "report" or "verification"')
         return v
-
-
-def _require_api_key(request: Request, x_assay_key: str | None = Header(default=None)) -> str:
-    if not x_assay_key:
-        raise HTTPException(status_code=401, detail="missing X-Assay-Key header")
-    store = request.app.state.key_store
-    if not verify_key(store, x_assay_key):
-        raise HTTPException(status_code=401, detail="invalid or revoked API key")
-    return x_assay_key
 
 
 def _save_screenshot(verification_id: str, screenshot_b64: str, output_dir: str) -> str:
