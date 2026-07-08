@@ -354,6 +354,153 @@ nav a{{margin-right:1.5rem}}
     return HTMLResponse(content=html)
 
 
+_SEVERITY_OPTIONS = ("info", "low", "medium", "error", "critical")
+_PRIORITY_OPTIONS = ("low", "medium", "high", "urgent")
+
+
+def _select_html(name: str, options: tuple[str, ...], current: str) -> str:
+    opts = ""
+    for opt in options:
+        selected = " selected" if opt == current else ""
+        opts += f'<option value="{_esc(opt)}"{selected}>{_esc(opt)}</option>'
+    if current and current not in options:
+        opts += f'<option value="{_esc(current)}" selected>{_esc(current)}</option>'
+    return f'<select name="{_esc(name)}">{opts}</select>'
+
+
+@app.get("/inbox", response_class=HTMLResponse)
+async def inbox(request: Request) -> HTMLResponse:
+    import base64 as _b64
+
+    from assay.store.db import list_packets_page as _list_new
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    packets = _list_new(db_path, triage_status="new")
+
+    rows = ""
+    if not packets:
+        rows = '<tr><td colspan="6" style="text-align:center">inbox is empty</td></tr>'
+    else:
+        for p in packets:
+            vid = str(p.get("verification_id", ""))
+            url = str(p.get("url", ""))
+            summary = str(p.get("summary", ""))
+            user_comment = str(p.get("user_comment") or "")
+            severity = str(p.get("severity") or "")
+            priority = str(p.get("priority") or "")
+
+            refs = p.get("artifact_refs", [])
+            ref_list = refs if isinstance(refs, list) else []
+            thumb_html = ""
+            for ref in ref_list:
+                ref_path = Path(str(ref))
+                if ref_path.suffix == ".png" and "_diff" not in ref_path.stem and ref_path.exists():
+                    thumb_b64 = _b64.b64encode(ref_path.read_bytes()).decode()
+                    thumb_html = (
+                        f'<img src="data:image/png;base64,{thumb_b64}" '
+                        'style="max-width:160px;max-height:120px;border:1px solid #333">'
+                    )
+                    break
+            if not thumb_html:
+                thumb_html = '<span style="color:#555">no screenshot</span>'
+
+            severity_select = _select_html("severity", _SEVERITY_OPTIONS, severity)
+            priority_select = _select_html("priority", _PRIORITY_OPTIONS, priority)
+
+            rows += (
+                "<tr>"
+                f"<td>{thumb_html}</td>"
+                f'<td><a href="/packet/{_esc(vid)}">{_esc(vid[:8])}…</a>'
+                f'<div style="color:#888;font-size:.8rem">{_esc(url)}</div></td>'
+                f"<td>{_esc(user_comment)}</td>"
+                f"<td>{_esc(summary)}</td>"
+                "<td>"
+                f'<form method="post" action="/inbox/{_esc(vid)}/triage" style="display:flex;'
+                'flex-direction:column;gap:.4rem;align-items:flex-start">'
+                f"{severity_select}"
+                f"{priority_select}"
+                '<div style="display:flex;gap:.4rem">'
+                '<button name="action" value="promote" style="background:#0a1a0a;'
+                "border:1px solid #2e7d32;color:#81c784;padding:.3rem .75rem;"
+                "border-radius:4px;font-family:monospace;font-size:.85rem;"
+                'cursor:pointer">Promote</button>'
+                '<button name="action" value="dismiss" style="background:#1a0a0a;'
+                "border:1px solid #c62828;color:#ef9a9a;padding:.3rem .75rem;"
+                "border-radius:4px;font-family:monospace;font-size:.85rem;"
+                'cursor:pointer">Dismiss</button>'
+                "</div>"
+                "</form>"
+                "</td>"
+                "</tr>"
+            )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assay — Inbox</title>
+<style>
+body{{font-family:monospace;background:#0d0d0d;color:#e0e0e0;margin:2rem}}
+h1{{color:#fff;border-bottom:1px solid #333;padding-bottom:.5rem}}
+table{{border-collapse:collapse;width:100%;margin-top:1rem}}
+th{{text-align:left;padding:.4rem .75rem;background:#1a1a1a;border-bottom:2px solid #333;font-size:.85rem}}
+td{{padding:.5rem .75rem;border-bottom:1px solid #1e1e1e;font-size:.85rem;vertical-align:top}}
+tr:hover td{{background:#141414}}
+select{{background:#0d0d0d;border:1px solid #333;color:#e0e0e0;padding:.2rem .4rem;
+border-radius:4px;font-family:monospace;font-size:.8rem}}
+a{{color:#90caf9;text-decoration:none}}
+a:hover{{text-decoration:underline}}
+nav{{margin-top:2rem;font-size:.85rem}}
+nav a{{margin-right:1.5rem}}
+</style>
+</head>
+<body>
+<h1>Assay — Triage Inbox</h1>
+<table>
+<thead>
+<tr>
+<th>screenshot</th><th>packet</th><th>user comment</th><th>summary</th><th>triage</th>
+</tr>
+</thead>
+<tbody>
+{rows}
+</tbody>
+</table>
+<nav><a href="/">Packets</a><a href="/checks">Checks</a><a href="/keys">API Keys</a><a href="/logout">Sign out</a></nav>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
+@app.post("/inbox/{verification_id}/triage")
+async def inbox_triage(
+    verification_id: str,
+    request: Request,
+    action: str = Form(...),
+    severity: str = Form(default=""),
+    priority: str = Form(default=""),
+) -> RedirectResponse:
+    from assay.store.db import get_packet as _get_packet
+    from assay.store.db import set_priority as _set_priority
+    from assay.store.db import set_severity as _set_severity
+    from assay.store.db import set_triage_status as _set_triage_status
+
+    db_path = Path(request.app.state.store_db).expanduser()
+    if _get_packet(verification_id, db_path) is None:
+        raise HTTPException(status_code=404, detail="packet not found")
+    if severity:
+        _set_severity(verification_id, severity, db_path)
+    if priority:
+        _set_priority(verification_id, priority, db_path)
+    if action == "promote":
+        _set_triage_status(verification_id, "promoted", db_path)
+    elif action == "dismiss":
+        _set_triage_status(verification_id, "dismissed", db_path)
+    else:
+        raise HTTPException(status_code=400, detail="action must be promote or dismiss")
+    return RedirectResponse("/inbox", status_code=303)
+
+
 @app.get("/checks", response_class=HTMLResponse)
 async def checks_dashboard(request: Request) -> HTMLResponse:
     from assay.store.db import init_db as _init
