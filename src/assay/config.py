@@ -65,8 +65,6 @@ class ScheduleConfig:
 class GrainConfig:
     project_root: str = ""
     output_path: str = ""
-    repo: str = ""
-    auto_create: bool = False
     phase: str = ""
     branch: str = ""
 
@@ -147,17 +145,6 @@ def _resolve_path(override: str | None) -> Path | None:
     if global_.exists():
         return global_
     return None
-
-
-def _parse_grain_auto_create(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        if value.lower() == "true":
-            return True
-        if value.lower() == "false":
-            return False
-    raise ConfigError(f"[grain] auto_create must be a boolean, got {value!r}")
 
 
 def _parse(raw: dict[str, object]) -> AssayConfig:
@@ -257,8 +244,6 @@ def _parse(raw: dict[str, object]) -> AssayConfig:
         grain=GrainConfig(
             project_root=str(grain.get("project_root", "")),
             output_path=str(grain.get("output_path", "")),
-            repo=str(grain.get("repo", "")),
-            auto_create=_parse_grain_auto_create(grain.get("auto_create", False)),
             phase=str(grain.get("phase", "")),
             branch=str(grain.get("branch", "")),
         ),
