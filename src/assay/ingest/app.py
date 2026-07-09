@@ -60,7 +60,9 @@ app.add_middleware(
 
 app.add_middleware(
     WardenMiddleware,
-    public_paths=frozenset({"/login", "/logout", "/ingest", "/health", "/docs", "/openapi.json"}),
+    public_paths=frozenset(
+        {"/login", "/logout", "/ingest", "/ping", "/health", "/docs", "/openapi.json"}
+    ),
     public_prefixes=("/status/", "/mcp", "/baselines", "/promotions"),
     login_url=LOGIN_URL if _SSO_ENABLED else None,
 )
@@ -230,6 +232,13 @@ async def ingest(
                 verification_id,
             )
     return {"status": "accepted"}
+
+
+@app.post("/ping")
+async def ping(_key: str = Depends(_require_api_key)) -> dict[str, str]:
+    # Lets a client (e.g. the CRM settings form) validate an API key over the exact
+    # same auth + CORS path as /ingest without persisting a verification packet.
+    return {"status": "ok"}
 
 
 @app.get("/login")

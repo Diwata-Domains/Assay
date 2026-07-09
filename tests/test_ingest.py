@@ -56,7 +56,29 @@ def test_valid_key_returns_200(client_with_key: tuple[TestClient, str]) -> None:
     c, key = client_with_key
     r = c.post("/ingest", json=_VALID_PAYLOAD, headers={"X-Assay-Key": key})
     assert r.status_code == 200
-    assert r.json() == {"status": "accepted"}
+
+
+# ---------------------------------------------------------------------------
+# Key validation ping — lets a client verify a key over the same auth + CORS
+# path as /ingest without sending a real capture packet.
+# ---------------------------------------------------------------------------
+
+
+def test_ping_missing_key_returns_401(client: TestClient) -> None:
+    r = client.post("/ping")
+    assert r.status_code == 401
+
+
+def test_ping_invalid_key_returns_401(client: TestClient) -> None:
+    r = client.post("/ping", headers={"X-Assay-Key": "bad-key"})
+    assert r.status_code == 401
+
+
+def test_ping_valid_key_returns_ok(client_with_key: tuple[TestClient, str]) -> None:
+    c, key = client_with_key
+    r = c.post("/ping", headers={"X-Assay-Key": key})
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
 
 
 def test_revoked_key_returns_401(tmp_path: Path) -> None:
