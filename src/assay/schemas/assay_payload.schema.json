@@ -16,6 +16,10 @@
       "type": ["string", "null"],
       "description": "Grain task packet ID being verified (e.g. TASK-0070). Null for standalone runs."
     },
+    "source_ticket_id": {
+      "type": ["string", "null"],
+      "description": "Owning Assay ticket id (ASSAY-<n>). The packet is a verification event on this ticket; an ingested verdict carries it so the loop can advance the ticket. Null for standalone packets with no ticket."
+    },
     "issue_type": {
       "type": "string",
       "enum": ["test_failure", "bug_finding", "screenshot_evidence", "trace_capture", "human_annotation", "code_review"],
