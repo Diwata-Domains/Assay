@@ -7,10 +7,26 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Optional, cast
 
+from grain_contracts.verification import Priority, State
+
 _DEFAULT_DB = Path.home() / ".assay" / "store.db"
+
+_STATE_VALUES = frozenset(s.value for s in State)
+_PRIORITY_VALUES = frozenset(p.value for p in Priority)
+
+_ALLOWED_TRANSITIONS: dict[State, frozenset[State]] = {
+    State.TRIAGE: frozenset({State.TODO, State.CANCELED}),
+    State.TODO: frozenset({State.IN_PROGRESS, State.CANCELED}),
+    State.IN_PROGRESS: frozenset({State.IN_REVIEW, State.CANCELED}),
+    State.IN_REVIEW: frozenset({State.DONE, State.CANCELED}),
+    State.DONE: frozenset(),
+    State.CANCELED: frozenset(),
+}
 
 _CREATE_PACKETS = """
 CREATE TABLE IF NOT EXISTS packets (
@@ -50,8 +66,39 @@ CREATE TABLE IF NOT EXISTS check_results (
 """
 
 
+_CREATE_TICKETS = """
+CREATE TABLE IF NOT EXISTS tickets (
+    id            TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    severity      TEXT NOT NULL,
+    priority      TEXT NOT NULL,
+    state         TEXT NOT NULL,
+    grain_task_id TEXT,
+    parent_id     TEXT REFERENCES tickets(id),
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+)
+"""
+
+
 class StoreError(Exception):
     """Raised on unrecoverable store failures."""
+
+
+def _utcnow() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _enum_value(value: object) -> str:
+    return str(value.value) if isinstance(value, Enum) else str(value)
+
+
+def _coerce_state(value: object) -> State:
+    raw = _enum_value(value)
+    try:
+        return State(raw)
+    except ValueError as exc:
+        raise StoreError(f"invalid ticket state: {raw!r}") from exc
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
@@ -69,8 +116,13 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
         conn.execute(_CREATE_PACKETS)
         conn.execute(_CREATE_BASELINES)
         conn.execute(_CREATE_CHECK_RESULTS)
+        conn.execute(_CREATE_TICKETS)
         try:
             conn.execute("ALTER TABLE packets ADD COLUMN diff_result TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE packets ADD COLUMN source_ticket_id TEXT")
         except sqlite3.OperationalError:
             pass
         try:
@@ -242,6 +294,8 @@ def _row_to_packet(row: sqlite3.Row) -> dict[str, object]:
     packet["severity"] = row["severity"]
     packet["triage_status"] = row["triage_status"]
     packet["priority"] = row["priority"]
+    if "source_ticket_id" in row.keys():
+        packet["source_ticket_id"] = row["source_ticket_id"]
     return packet
 
 
@@ -256,7 +310,8 @@ def get_packet(
     try:
         with _connect(path) as conn:
             row = conn.execute(
-                "SELECT raw, severity, triage_status, priority FROM packets WHERE verification_id = ?",
+                "SELECT raw, severity, triage_status, priority, source_ticket_id "
+                "FROM packets WHERE verification_id = ?",
                 (verification_id,),
             ).fetchone()
     except sqlite3.Error as exc:
@@ -465,3 +520,220 @@ def set_priority(
 ) -> None:
     """Set priority on a packet. Raises StoreError if not found."""
     _set_column(verification_id, "priority", priority, db_path)
+
+
+def _next_ticket_id(conn: sqlite3.Connection) -> str:
+    """Return the next monotonic ``ASSAY-<n>`` id. Must run inside a write transaction."""
+    row = conn.execute(
+        "SELECT id FROM tickets WHERE id GLOB 'ASSAY-[0-9]*' "
+        "ORDER BY CAST(SUBSTR(id, 7) AS INTEGER) DESC LIMIT 1"
+    ).fetchone()
+    n = int(str(row["id"]).split("-", 1)[1]) if row is not None else 0
+    return f"ASSAY-{n + 1}"
+
+
+def insert_ticket(
+    title: str,
+    severity: str,
+    priority: str = "none",
+    state: object = State.TRIAGE,
+    grain_task_id: Optional[str] = None,  # noqa: UP007
+    parent_id: Optional[str] = None,  # noqa: UP007
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> str:
+    """Create a ticket with a freshly minted ``ASSAY-<n>`` id. Returns the id.
+
+    The id is minted under a ``BEGIN IMMEDIATE`` write lock so concurrent writers
+    to the single-writer SQLite store cannot mint the same number.
+    """
+    path = db_path or _DEFAULT_DB
+    state_value = _coerce_state(state).value
+    priority_value = _enum_value(priority)
+    severity_value = _enum_value(severity)
+    if priority_value not in _PRIORITY_VALUES:
+        raise StoreError(f"invalid priority: {priority_value!r}")
+    if not title:
+        raise StoreError("ticket requires a non-empty title")
+    now = _utcnow()
+    try:
+        with _connect(path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            ticket_id = _next_ticket_id(conn)
+            conn.execute(
+                """
+                INSERT INTO tickets
+                    (id, title, severity, priority, state, grain_task_id,
+                     parent_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ticket_id,
+                    title,
+                    severity_value,
+                    priority_value,
+                    state_value,
+                    grain_task_id,
+                    parent_id,
+                    now,
+                    now,
+                ),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"insert_ticket failed: {exc}") from exc
+    return ticket_id
+
+
+def get_ticket(
+    ticket_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> Optional[dict[str, object]]:  # noqa: UP007
+    """Return a single ticket by id, or None if not found."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return None
+    try:
+        with _connect(path) as conn:
+            row = conn.execute(
+                "SELECT id, title, severity, priority, state, grain_task_id, "
+                "parent_id, created_at, updated_at FROM tickets WHERE id = ?",
+                (ticket_id,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StoreError(f"get_ticket failed: {exc}") from exc
+    return cast(dict[str, object], dict(row)) if row is not None else None
+
+
+def advance_ticket(
+    ticket_id: str,
+    new_state: object,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Move a ticket to ``new_state`` if the transition is legal. Raises StoreError otherwise.
+
+    Legal path: triage -> todo -> in_progress -> in_review -> done, with canceled
+    reachable from any non-terminal state. done and canceled are terminal.
+    """
+    path = db_path or _DEFAULT_DB
+    target = _coerce_state(new_state)
+    try:
+        with _connect(path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT state FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+            if row is None:
+                raise StoreError(f"ticket {ticket_id} not found")
+            current = _coerce_state(row["state"])
+            if target not in _ALLOWED_TRANSITIONS[current]:
+                raise StoreError(f"illegal transition {current.value} -> {target.value}")
+            conn.execute(
+                "UPDATE tickets SET state = ?, updated_at = ? WHERE id = ?",
+                (target.value, _utcnow(), ticket_id),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"advance_ticket failed: {exc}") from exc
+
+
+def set_ticket_grain_task_id(
+    ticket_id: str,
+    grain_task_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Bind a ticket to the Grain ``TASK-####`` minted for it. Ticket<->task stays 1:1 (CP-006 §3)."""
+    path = db_path or _DEFAULT_DB
+    try:
+        with _connect(path) as conn:
+            cur = conn.execute(
+                "UPDATE tickets SET grain_task_id = ?, updated_at = ? WHERE id = ?",
+                (grain_task_id, _utcnow(), ticket_id),
+            )
+            if cur.rowcount == 0:
+                raise StoreError(f"ticket {ticket_id} not found")
+    except sqlite3.Error as exc:
+        raise StoreError(f"set_ticket_grain_task_id failed: {exc}") from exc
+
+
+def set_source_ticket_id(
+    verification_id: str,
+    ticket_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Link a packet to its owning ticket via ``packets.source_ticket_id``."""
+    path = db_path or _DEFAULT_DB
+    try:
+        with _connect(path) as conn:
+            cur = conn.execute(
+                "UPDATE packets SET source_ticket_id = ? WHERE verification_id = ?",
+                (ticket_id, verification_id),
+            )
+            if cur.rowcount == 0:
+                raise StoreError(f"packet {verification_id} not found")
+    except sqlite3.Error as exc:
+        raise StoreError(f"set_source_ticket_id failed: {exc}") from exc
+
+
+def _derive_backfill_state(
+    triage_status: Optional[str],  # noqa: UP007
+    review_status: Optional[str],  # noqa: UP007
+    outcome: Optional[str],  # noqa: UP007
+) -> State:
+    """Map a legacy packet's live status columns onto the single ticket lifecycle.
+
+    A human-approved review is terminal (done); a dismissal is canceled. An imported
+    packet had a Grain task open, so a passing verification proposed closure (in_review)
+    while a failing/rejected one stayed in_progress. Promoted-but-unpulled is todo;
+    everything earlier is still triage.
+    """
+    if review_status == "approved":
+        return State.DONE
+    if triage_status == "dismissed":
+        return State.CANCELED
+    if triage_status == "imported":
+        if review_status == "rejected":
+            return State.IN_PROGRESS
+        return State.IN_REVIEW if outcome == "pass" else State.IN_PROGRESS
+    if triage_status == "promoted":
+        return State.TODO
+    return State.TRIAGE
+
+
+def backfill_tickets(db_path: Optional[Path] = None) -> int:  # noqa: UP007
+    """Create one ticket per packet that has none yet, deriving state from live columns.
+
+    State is derived from the LIVE ``triage_status``/``review_status``/``outcome`` columns
+    (via :func:`_row_to_packet`'s overlay), never from stale ``raw``. Returns the count of
+    tickets created. Idempotent: packets already linked via ``source_ticket_id`` are skipped.
+    """
+    path = db_path or _DEFAULT_DB
+    init_db(path)
+    with _connect(path) as conn:
+        rows = conn.execute(
+            "SELECT verification_id, raw, severity, triage_status, priority, "
+            "review_status, outcome FROM packets WHERE source_ticket_id IS NULL "
+            "ORDER BY verified_at ASC, verification_id ASC"
+        ).fetchall()
+    count = 0
+    for row in rows:
+        packet = _row_to_packet(row)
+        state = _derive_backfill_state(
+            _opt_str(packet.get("triage_status")),
+            _opt_str(row["review_status"]),
+            _opt_str(row["outcome"]),
+        )
+        severity = _opt_str(packet.get("severity")) or "info"
+        priority = _opt_str(packet.get("priority")) or "none"
+        title = _opt_str(packet.get("summary")) or str(row["verification_id"])
+        grain_task_id = _opt_str(packet.get("task_id"))
+        ticket_id = insert_ticket(
+            title=title,
+            severity=severity,
+            priority=priority,
+            state=state,
+            grain_task_id=grain_task_id,
+            db_path=path,
+        )
+        set_source_ticket_id(str(row["verification_id"]), ticket_id, path)
+        count += 1
+    return count
+
+
+def _opt_str(value: object) -> Optional[str]:  # noqa: UP007
+    return str(value) if value is not None else None

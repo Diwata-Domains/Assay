@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from grain_contracts.verification import State
 from pydantic import BaseModel, field_validator, model_validator
 
 from assay._vendor.warden import (
@@ -145,6 +146,7 @@ class IngestPayload(BaseModel):
     screenshot: str
     user_comment: str | None = None
     task_id: str | None = None
+    source_ticket_id: str | None = None
     metadata: dict[str, Any] = {}
     kind: str = "report"
 
@@ -208,6 +210,11 @@ async def ingest(
     packet["url"] = payload.url
     if payload.task_id:
         packet["task_id"] = payload.task_id
+    source_ticket_id = payload.source_ticket_id or (
+        str(payload.metadata.get("source_ticket_id", "")) or None
+    )
+    if source_ticket_id:
+        packet["source_ticket_id"] = source_ticket_id
     output_dir = request.app.state.output_dir
     verification_id = str(packet["verification_id"])
     screenshot_path = _save_screenshot(verification_id, payload.screenshot, output_dir)
@@ -220,6 +227,23 @@ async def ingest(
     # _store_ingest_packet so it persists in the stored packet's `raw` JSON.
     packet["kind"] = payload.kind
     _store_ingest_packet(packet, request.app.state.store_db)
+    if source_ticket_id:
+        from assay.store.db import StoreError as _StoreError
+        from assay.store.db import set_source_ticket_id
+
+        try:
+            set_source_ticket_id(
+                verification_id,
+                source_ticket_id,
+                Path(request.app.state.store_db).expanduser(),
+            )
+        except _StoreError:
+            logger.warning(
+                "could not link verification_id=%s to source_ticket_id=%s; packet stored "
+                "without the ticket link",
+                verification_id,
+                source_ticket_id,
+            )
     if payload.kind == "report" or (payload.kind == "verification" and packet.get("outcome") == "fail"):
         from assay.store.db import StoreError, set_triage_status
 
@@ -231,7 +255,58 @@ async def ingest(
                 "did not enter the triage inbox",
                 verification_id,
             )
+    _wire_ticket(payload, packet, verification_id, source_ticket_id, request.app.state.store_db)
     return {"status": "accepted"}
+
+
+def _wire_ticket(
+    payload: "IngestPayload",
+    packet: dict[str, object],
+    verification_id: str,
+    source_ticket_id: str | None,
+    store_db: str,
+) -> None:
+    """Bind an ingested packet to the CP-006 durable ticket lifecycle.
+
+    A fresh finding (`kind="report"`, no incoming ticket) mints a durable ticket in
+    ``triage`` so the loop has a stable ``ASSAY-<n>`` to close back onto. A returned
+    verdict (`kind="verification"`) advances the owning ticket: a PASS proposes closure
+    (``in_progress -> in_review``); a FAIL holds it at ``in_progress`` because Grain
+    reopens the SAME task (ticket<->task stays 1:1). All ticket writes are best-effort:
+    a store failure must not fail the ingest that already persisted the packet.
+    """
+    from assay.store.db import (
+        StoreError,
+        advance_ticket,
+        get_ticket,
+        insert_ticket,
+        set_source_ticket_id,
+    )
+
+    db = Path(store_db).expanduser()
+    try:
+        if payload.kind == "verification" and source_ticket_id:
+            ticket = get_ticket(str(source_ticket_id), db)
+            if ticket is None:
+                return
+            outcome = str(packet.get("outcome", ""))
+            if outcome == "pass" and ticket.get("state") == State.IN_PROGRESS.value:
+                advance_ticket(str(source_ticket_id), State.IN_REVIEW, db)
+        elif payload.kind == "report" and not source_ticket_id:
+            ticket_id = insert_ticket(
+                title=str(packet.get("summary") or verification_id),
+                severity=str(packet.get("severity") or "info"),
+                priority=str(packet.get("priority") or "none"),
+                db_path=db,
+            )
+            set_source_ticket_id(verification_id, ticket_id, db)
+    except StoreError:
+        logger.warning(
+            "ticket wiring failed for verification_id=%s (kind=%s); packet stored but the "
+            "ticket lifecycle did not advance",
+            verification_id,
+            payload.kind,
+        )
 
 
 @app.post("/ping")
@@ -488,7 +563,8 @@ async def inbox_triage(
     from assay.store.db import set_triage_status as _set_triage_status
 
     db_path = Path(request.app.state.store_db).expanduser()
-    if _get_packet(verification_id, db_path) is None:
+    packet = _get_packet(verification_id, db_path)
+    if packet is None:
         raise HTTPException(status_code=404, detail="packet not found")
     if severity:
         _set_severity(verification_id, severity, db_path)
@@ -496,11 +572,34 @@ async def inbox_triage(
         _set_priority(verification_id, priority, db_path)
     if action == "promote":
         _set_triage_status(verification_id, "promoted", db_path)
+        _advance_owning_ticket(packet, State.TODO, db_path)
     elif action == "dismiss":
         _set_triage_status(verification_id, "dismissed", db_path)
+        _advance_owning_ticket(packet, State.CANCELED, db_path)
     else:
         raise HTTPException(status_code=400, detail="action must be promote or dismiss")
     return RedirectResponse("/inbox", status_code=303)
+
+
+def _advance_owning_ticket(packet: dict[str, object], target: State, db_path: Path) -> None:
+    """Advance a packet's owning ticket out of ``triage`` when it is triaged.
+
+    Only fires when the ticket is still in ``triage`` (the sole legal source for both
+    ``todo`` and ``canceled``), so a re-triage of the same packet is an idempotent no-op
+    rather than an illegal transition. Best-effort: never fail the operator's action if
+    the ticket write fails.
+    """
+    from assay.store.db import StoreError, advance_ticket, get_ticket
+
+    ticket_id = packet.get("source_ticket_id")
+    if not ticket_id:
+        return
+    try:
+        ticket = get_ticket(str(ticket_id), db_path)
+        if ticket is not None and ticket.get("state") == State.TRIAGE.value:
+            advance_ticket(str(ticket_id), target, db_path)
+    except StoreError:
+        logger.warning("could not advance ticket %s to %s", ticket_id, target.value)
 
 
 @app.get("/checks", response_class=HTMLResponse)
