@@ -8,9 +8,19 @@ services:
     environment:
       - ASSAY_ADMIN_EMAIL=${ASSAY_ADMIN_EMAIL}
       - ASSAY_ADMIN_PASSWORD_HASH=${ASSAY_ADMIN_PASSWORD_HASH}
-      - ASSAY_JWT_SECRET=${ASSAY_JWT_SECRET}
+      # The app reads WARDEN_SECRET (vendored warden), not ASSAY_JWT_SECRET.
+      - WARDEN_SECRET=${WARDEN_SECRET}
     expose:
       - "8000"
+    healthcheck:
+      # python is in the app image (no curl); hit the same /health nginx proxies.
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   nginx:
     image: nginx:alpine
