@@ -8,6 +8,7 @@ from assay.formatter.formatter import format_packet
 from assay.runner.artifacts import ArtifactBundle
 
 _UUID4_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+_VERIFY_RE = re.compile(r"^VERIFY-\d+-\d+$")
 
 
 def _bundle(
@@ -29,10 +30,13 @@ def _bundle(
     )
 
 
-def test_verification_id_is_uuid4() -> None:
+def test_generated_verification_id_is_canonical_not_uuid() -> None:
+    # CP-006 §5: a minted id is canonical VERIFY-####-NNN, never a UUID (grain verify ingest
+    # rejects UUIDs). This is the "not a silent UUID" guard.
     packet = format_packet(_bundle())
     vid = str(packet["verification_id"])
-    assert _UUID4_RE.match(vid), f"not a UUID4: {vid}"
+    assert _VERIFY_RE.match(vid), f"not a canonical VERIFY id: {vid}"
+    assert not _UUID4_RE.match(vid), f"reintroduced a uuid4: {vid}"
 
 
 def test_verification_id_unique_each_call() -> None:

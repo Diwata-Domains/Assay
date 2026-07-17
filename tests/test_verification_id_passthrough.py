@@ -33,11 +33,12 @@ def test_format_packet_uses_provided_verification_id() -> None:
     assert packet["verification_id"] == "VERIFY-0041-001"
 
 
-def test_format_packet_generates_uuid_when_not_provided() -> None:
+def test_format_packet_generates_canonical_id_when_not_provided() -> None:
+    import re
+
     packet = format_packet(_PASS_BUNDLE)
     vid = str(packet["verification_id"])
-    assert vid != "VERIFY-0041-001"
-    assert len(vid) > 10
+    assert re.match(r"^VERIFY-\d+-\d+$", vid), f"not a canonical VERIFY id: {vid}"
 
 
 def test_format_sdk_packet_uses_provided_verification_id() -> None:
@@ -104,3 +105,91 @@ def test_ingest_metadata_verification_id_passthrough(tmp_path: Path) -> None:
     assert len(packets) == 1
     data = json.loads(packets[0].read_text())
     assert data["verification_id"] == "VERIFY-0041-003"
+
+
+def _ingest_client(tmp_path: Path) -> tuple[object, str, Path]:
+    from fastapi.testclient import TestClient
+
+    from assay.ingest.app import app as ingest_app
+    from assay.keys.store import create_key
+
+    key_file = str(tmp_path / "keys.json")
+    raw_key = create_key(key_file)
+    db = tmp_path / "store.db"
+    ingest_app.state.key_store = key_file
+    ingest_app.state.output_dir = str(tmp_path)
+    ingest_app.state.store_db = str(db)
+    return TestClient(ingest_app), raw_key, db
+
+
+def _ingest_body() -> dict[str, object]:
+    return {
+        "captured_at": "2026-05-08T10:00:00Z",
+        "url": "https://example.com",
+        "viewport": {"width": 1280, "height": 800},
+        "user_agent": "Mozilla/5.0",
+        "screenshot": base64.b64encode(b"fake-png").decode(),
+    }
+
+
+def test_ingest_carries_source_ticket_id_field(tmp_path: Path) -> None:
+    from assay.store.db import get_packet
+
+    client, raw_key, db = _ingest_client(tmp_path)
+    payload = {**_ingest_body(), "source_ticket_id": "ASSAY-7"}
+    resp = client.post("/ingest", json=payload, headers={"X-Assay-Key": raw_key})
+    assert resp.status_code == 200
+
+    data = json.loads(next(tmp_path.glob("assay-*.json")).read_text())
+    assert data["source_ticket_id"] == "ASSAY-7"
+
+    vid = data["verification_id"]
+    stored = get_packet(vid, db)
+    assert stored is not None
+    assert stored["source_ticket_id"] == "ASSAY-7"
+
+
+def test_ingest_source_ticket_id_from_metadata_fallback(tmp_path: Path) -> None:
+    client, raw_key, db = _ingest_client(tmp_path)
+    payload = {**_ingest_body(), "metadata": {"source_ticket_id": "ASSAY-9"}}
+    resp = client.post("/ingest", json=payload, headers={"X-Assay-Key": raw_key})
+    assert resp.status_code == 200
+
+    data = json.loads(next(tmp_path.glob("assay-*.json")).read_text())
+    assert data["source_ticket_id"] == "ASSAY-9"
+
+
+def test_ingest_generates_canonical_verify_id_not_uuid(tmp_path: Path) -> None:
+    import re
+
+    client, raw_key, db = _ingest_client(tmp_path)
+    resp = client.post("/ingest", json=_ingest_body(), headers={"X-Assay-Key": raw_key})
+    assert resp.status_code == 200
+
+    data = json.loads(next(tmp_path.glob("assay-*.json")).read_text())
+    vid = str(data["verification_id"])
+    assert re.match(r"^VERIFY-\d+-\d+$", vid), f"not a canonical VERIFY id: {vid}"
+
+
+def test_legacy_uuid_packet_reads_without_error(tmp_path: Path) -> None:
+    # Backward-compat: historical packets minted with a uuid4 verification_id must still read
+    # back cleanly (no 500 / no exception) even though new packets require VERIFY-####-NNN.
+    from assay.store.db import get_packet, init_db, insert_packet
+
+    db = tmp_path / "store.db"
+    init_db(db)
+    legacy = {
+        "verification_id": "a1b2c3d4-1111-2222-3333-444444444444",
+        "task_id": "TASK-0001",
+        "issue_type": "test_failure",
+        "severity": "error",
+        "outcome": "fail",
+        "summary": "legacy finding",
+        "artifact_refs": [],
+        "followup_candidates": [],
+        "verified_at": "2026-01-01T00:00:00Z",
+    }
+    insert_packet(legacy, db)
+    stored = get_packet("a1b2c3d4-1111-2222-3333-444444444444", db)
+    assert stored is not None
+    assert stored["verification_id"] == "a1b2c3d4-1111-2222-3333-444444444444"

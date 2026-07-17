@@ -22,7 +22,6 @@ findings into `summary` + `artifact_refs`.
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -240,8 +239,10 @@ def format_review_packet(
         if ref not in refs:
             refs.append(ref)
 
+    from assay.formatter.formatter import mint_verification_id
+
     return {
-        "verification_id": verification_id if verification_id else str(uuid.uuid4()),
+        "verification_id": verification_id if verification_id else mint_verification_id(),
         "task_id": task_id,
         "issue_type": REVIEW_ISSUE_TYPE,
         "severity": result.severity,

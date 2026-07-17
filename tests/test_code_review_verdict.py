@@ -255,9 +255,11 @@ def test_packet_severity_tracks_findings() -> None:
     assert format_review_packet(r)["severity"] == "critical"
 
 
-def test_packet_verification_id_defaults_to_uuid4() -> None:
+def test_packet_verification_id_defaults_to_canonical_verify_id() -> None:
     packet = format_review_packet(_result())
-    assert _UUID4_RE.match(str(packet["verification_id"]))
+    vid = str(packet["verification_id"])
+    assert re.match(r"^VERIFY-\d+-\d+$", vid), f"not a canonical VERIFY id: {vid}"
+    assert not _UUID4_RE.match(vid), f"reintroduced a uuid4: {vid}"
 
 
 def test_packet_verification_id_passed_through() -> None:

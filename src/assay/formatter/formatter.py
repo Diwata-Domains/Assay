@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import uuid
+import secrets
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
@@ -14,6 +14,18 @@ from assay.runner.artifacts import ArtifactBundle
 if TYPE_CHECKING:
     from assay.ingest.app import IngestPayload
     from assay.review.verdict import CodeReviewResult
+
+
+def mint_verification_id() -> str:
+    """Mint a canonical ``VERIFY-####-NNN`` id for a packet with no Grain-issued id.
+
+    CP-006 §5: the canonical verification id is ``VERIFY-####-NNN``, never a UUID — Grain's
+    ingest validator rejects UUIDs on an exact-shape check. When Grain issues the id it is
+    threaded through unchanged; only when omitted does Assay generate one, and it must carry
+    the canonical shape (Grain's regex is ``VERIFY-(\\d+)-(\\d+)``) rather than a uuid4.
+    """
+    stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    return f"VERIFY-{stamp}-{secrets.randbelow(1000):03d}"
 
 _ISSUE_TYPE_MAP = {
     "pass": "test_failure",
@@ -54,7 +66,7 @@ def format_packet(
     Args:
         bundle: Populated ArtifactBundle from collect_artifacts().
         task_id: Grain TASK-#### ID being verified; None for standalone runs.
-        verification_id: Grain-issued VERIFY-XXXX-NNN ID; generates UUID if None.
+        verification_id: Grain-issued VERIFY-XXXX-NNN ID; a canonical one is minted if None.
 
     Returns:
         Dict conforming to data_contracts.md §1 Grain Sentinel payload schema.
@@ -67,7 +79,7 @@ def format_packet(
             artifact_refs.append(step.screenshot_path)
 
     packet: dict[str, object] = {
-        "verification_id": verification_id if verification_id else str(uuid.uuid4()),
+        "verification_id": verification_id if verification_id else mint_verification_id(),
         "task_id": task_id,
         "issue_type": _ISSUE_TYPE_MAP.get(bundle.outcome, "test_failure"),
         "severity": _SEVERITY_MAP.get(bundle.outcome, "warning"),
@@ -136,7 +148,7 @@ def format_sdk_packet(
 
     Args:
         payload: Validated IngestPayload from the POST /ingest handler.
-        verification_id: Grain-issued VERIFY-XXXX-NNN ID; generates UUID if None.
+        verification_id: Grain-issued VERIFY-XXXX-NNN ID; a canonical one is minted if None.
 
     Returns:
         Dict conforming to data_contracts.md §1 schema.
@@ -145,7 +157,7 @@ def format_sdk_packet(
     summary = f"SDK capture: {payload.url}" + (f" — {comment}" if comment else "")
 
     return {
-        "verification_id": verification_id if verification_id else str(uuid.uuid4()),
+        "verification_id": verification_id if verification_id else mint_verification_id(),
         "task_id": None,
         "issue_type": "screenshot_evidence",
         "severity": "info",

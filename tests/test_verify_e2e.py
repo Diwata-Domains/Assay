@@ -33,7 +33,7 @@ _PASS_RESULT = RunResult(output_dir="/tmp/out", exit_code=0, stdout="", stderr="
 _VALID_ISSUE_TYPES = {"test_failure", "bug_finding", "screenshot_evidence", "trace_capture", "human_annotation"}
 _VALID_SEVERITIES = {"info", "warning", "error", "critical"}
 _VALID_OUTCOMES = {"pass", "fail", "inconclusive"}
-_VERIFY_RE = re.compile(r"^VERIFY-\d{4}-\d{3}$")
+_VERIFY_RE = re.compile(r"^VERIFY-\d+-\d+$")
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
@@ -62,11 +62,14 @@ def test_packet_with_verify_id_passes_grain_validation() -> None:
     assert errors == [], f"grain validation errors: {errors}"
 
 
-def test_packet_without_verify_id_fails_verify_format_check() -> None:
+def test_packet_without_verify_id_mints_canonical_not_uuid() -> None:
+    # CP-006 §5: a minted id is canonical VERIFY-####-NNN, never a UUID. It is well-formed but
+    # is not the Grain-issued id, so it still fails validation against a specific expected id
+    # (a mismatch, not a shape rejection).
     packet = format_packet(_BUNDLE, task_id="TASK-0041")
     vid = str(packet["verification_id"])
-    assert _UUID_RE.match(vid), "expected UUID"
-    assert not _VERIFY_RE.match(vid), "UUID should not match VERIFY format"
+    assert not _UUID_RE.match(vid), "minted id must not be a UUID"
+    assert _VERIFY_RE.match(vid), f"minted id must be canonical VERIFY shape: {vid}"
     errors = _validate_grain_payload(packet, "VERIFY-0041-001")
     assert any("mismatch" in e for e in errors)
 

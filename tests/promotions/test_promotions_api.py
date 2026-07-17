@@ -17,7 +17,14 @@ from fastapi.testclient import TestClient
 
 from assay.ingest.app import app
 from assay.keys.store import create_key
-from assay.store.db import get_packet, init_db, insert_packet, set_triage_status
+from assay.store.db import (
+    backfill_tickets,
+    get_packet,
+    get_ticket,
+    init_db,
+    insert_packet,
+    set_triage_status,
+)
 
 
 def _packet(vid: str, **overrides: object) -> dict[str, object]:
@@ -122,3 +129,52 @@ def test_ack_not_currently_promoted_is_idempotent_200(promo_client: tuple[TestCl
     resp = client.post("/promotions/v_new/ack", headers={"X-Assay-Key": key})
     assert resp.status_code == 200
     assert get_packet("v_new", db)["triage_status"] == "imported"
+
+
+def test_ack_records_grain_task_and_advances_ticket(
+    promo_client: tuple[TestClient, str, Path],
+) -> None:
+    # CP-006 §3: the ack records the minted TASK-#### on the ticket and moves it todo -> in_progress.
+    client, key, db = promo_client
+    backfill_tickets(db)
+    ticket_id = str(get_packet("v_prom", db)["source_ticket_id"])
+    assert get_ticket(ticket_id, db)["state"] == "todo"
+
+    resp = client.post(
+        "/promotions/v_prom/ack",
+        headers={"X-Assay-Key": key},
+        json={"grain_task_id": "TASK-0100"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["grain_task_id"] == "TASK-0100"
+    assert body["ticket_id"] == ticket_id
+
+    ticket = get_ticket(ticket_id, db)
+    assert ticket["grain_task_id"] == "TASK-0100"
+    assert ticket["state"] == "in_progress"
+
+
+def test_ack_advance_is_idempotent_on_reack(promo_client: tuple[TestClient, str, Path]) -> None:
+    # A second ack (Grain retrying) must not error even though the ticket already left `todo`.
+    client, key, db = promo_client
+    backfill_tickets(db)
+    ticket_id = str(get_packet("v_prom", db)["source_ticket_id"])
+    hdr = {"X-Assay-Key": key}
+    assert client.post("/promotions/v_prom/ack", headers=hdr, json={"grain_task_id": "TASK-0100"}).status_code == 200
+    assert client.post("/promotions/v_prom/ack", headers=hdr, json={"grain_task_id": "TASK-0100"}).status_code == 200
+    assert get_ticket(ticket_id, db)["state"] == "in_progress"
+
+
+def test_ack_without_grain_task_still_marks_imported(
+    promo_client: tuple[TestClient, str, Path],
+) -> None:
+    # Backward-compat: an empty-body ack (no grain_task_id) still imports; ticket stays put.
+    client, key, db = promo_client
+    backfill_tickets(db)
+    ticket_id = str(get_packet("v_prom", db)["source_ticket_id"])
+    resp = client.post("/promotions/v_prom/ack", headers={"X-Assay-Key": key})
+    assert resp.status_code == 200
+    assert resp.json()["grain_task_id"] is None
+    assert get_packet("v_prom", db)["triage_status"] == "imported"
+    assert get_ticket(ticket_id, db)["state"] == "todo"
