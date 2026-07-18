@@ -68,7 +68,7 @@ class AnthropicLLMClient:
         if self._client is not None:
             return self._client
         try:
-            import anthropic  # type: ignore[import-not-found]
+            import anthropic  # type: ignore[import-not-found, unused-ignore]
         except ImportError as exc:
             raise LLMClientError(
                 "code review requires the optional 'anthropic' dependency. "
