@@ -16,6 +16,7 @@ from assay.store.db import (
     init_db,
     insert_packet,
     insert_ticket,
+    list_tickets,
 )
 
 
@@ -95,6 +96,29 @@ def test_insert_ticket_rejects_bad_priority(tmp_path: Path) -> None:
     init_db(db)
     with pytest.raises(StoreError):
         insert_ticket("f", "info", "sky-high", db_path=db)
+
+
+def test_list_tickets_returns_all(tmp_path: Path) -> None:
+    db = tmp_path / "store.db"
+    init_db(db)
+    a = insert_ticket("first", "info", db_path=db)
+    b = insert_ticket("second", "error", db_path=db)
+    assert {t["id"] for t in list_tickets(db_path=db)} == {a, b}
+
+
+def test_list_tickets_filters_by_state(tmp_path: Path) -> None:
+    db = tmp_path / "store.db"
+    init_db(db)
+    triaged = insert_ticket("stays", "info", db_path=db)
+    moved = insert_ticket("moves", "info", db_path=db)
+    advance_ticket(moved, State.TODO, db_path=db)
+    ids = [t["id"] for t in list_tickets("todo", db_path=db)]
+    assert ids == [moved]
+    assert triaged not in ids
+
+
+def test_list_tickets_empty_when_no_db(tmp_path: Path) -> None:
+    assert list_tickets(db_path=tmp_path / "nope.db") == []
 
 
 def test_insert_ticket_rejects_bad_state(tmp_path: Path) -> None:

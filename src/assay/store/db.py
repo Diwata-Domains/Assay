@@ -16,7 +16,6 @@ from grain_contracts.verification import Priority, State
 
 _DEFAULT_DB = Path.home() / ".assay" / "store.db"
 
-_STATE_VALUES = frozenset(s.value for s in State)
 _PRIORITY_VALUES = frozenset(p.value for p in Priority)
 
 _ALLOWED_TRANSITIONS: dict[State, frozenset[State]] = {
@@ -601,6 +600,35 @@ def get_ticket(
     except sqlite3.Error as exc:
         raise StoreError(f"get_ticket failed: {exc}") from exc
     return cast(dict[str, object], dict(row)) if row is not None else None
+
+
+def list_tickets(
+    state: object = None,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> list[dict[str, object]]:
+    """Return tickets newest-first; filter by ``state`` (str or State) when given."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return []
+    state_value = _coerce_state(state).value if state is not None else None
+    try:
+        with _connect(path) as conn:
+            if state_value is None:
+                rows = conn.execute(
+                    "SELECT id, title, severity, priority, state, grain_task_id, "
+                    "parent_id, created_at, updated_at FROM tickets "
+                    "ORDER BY created_at DESC"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, title, severity, priority, state, grain_task_id, "
+                    "parent_id, created_at, updated_at FROM tickets "
+                    "WHERE state = ? ORDER BY created_at DESC",
+                    (state_value,),
+                ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_tickets failed: {exc}") from exc
+    return [cast(dict[str, object], dict(row)) for row in rows]
 
 
 def advance_ticket(

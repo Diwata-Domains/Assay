@@ -33,12 +33,14 @@ key_app = typer.Typer(help="Manage API keys for the ingest endpoint.")
 store_app = typer.Typer(help="Manage the SQLite packet store.")
 admin_app = typer.Typer(help="Admin credential management.")
 baseline_app = typer.Typer(help="Manage visual-regression baselines (headless; no dashboard).")
+ticket_app = typer.Typer(help="Manage durable tickets (ASSAY-<n>) — the CP-006 work items.")
 
 app.add_typer(schedule_app, name="schedule")
 app.add_typer(key_app, name="key")
 app.add_typer(store_app, name="store")
 app.add_typer(admin_app, name="admin")
 app.add_typer(baseline_app, name="baseline")
+app.add_typer(ticket_app, name="ticket")
 
 _NOT_IMPLEMENTED = "not implemented"
 
@@ -985,6 +987,64 @@ def store_migrate(ctx: typer.Context) -> None:
     init_db(db_path)
     created = backfill_tickets(db_path)
     typer.echo(f"backfilled: {created} ticket(s)")
+
+
+@ticket_app.command("confirm")
+def ticket_confirm(
+    ctx: typer.Context,
+    ticket_id: str = typer.Argument(..., help="Ticket id, e.g. ASSAY-12."),
+) -> None:
+    """Confirm closure of a reviewed ticket: in_review -> done.
+
+    The human half of CP-006's propose-for-confirm loop: a passing verification
+    only *proposes* closure; this performs it. ``advance_ticket`` enforces that
+    only a ticket already in ``in_review`` can reach ``done``.
+    """
+    from pathlib import Path as _Path
+
+    from grain_contracts.verification import State
+
+    from assay.store.db import StoreError, advance_ticket, get_ticket, init_db
+
+    config: AssayConfig = ctx.obj
+    db_path = _Path(config.store.db).expanduser()
+    init_db(db_path)
+    if get_ticket(ticket_id, db_path) is None:
+        typer.echo(f"ticket {ticket_id} not found", err=True)
+        raise typer.Exit(code=1)
+    try:
+        advance_ticket(ticket_id, State.DONE, db_path)
+    except StoreError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"{ticket_id}: confirmed done")
+
+
+@ticket_app.command("list")
+def ticket_list(
+    ctx: typer.Context,
+    state: Optional[str] = typer.Option(  # noqa: UP007
+        None, "--state", help="Filter by state, e.g. in_review."
+    ),
+) -> None:
+    """List tickets newest-first; ``--state in_review`` shows those awaiting confirm."""
+    from pathlib import Path as _Path
+
+    from assay.store.db import StoreError, init_db, list_tickets
+
+    config: AssayConfig = ctx.obj
+    db_path = _Path(config.store.db).expanduser()
+    init_db(db_path)
+    try:
+        tickets = list_tickets(state, db_path)
+    except StoreError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    if not tickets:
+        typer.echo("(no tickets)")
+        return
+    for t in tickets:
+        typer.echo(f"{t['id']}  {str(t['state']):<12}  {str(t['priority']):<8}  {t['title']}")
 
 
 # ---------------------------------------------------------------------------
