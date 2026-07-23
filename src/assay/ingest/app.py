@@ -85,11 +85,13 @@ def _esc(value: object) -> str:
 
 from assay.api.mcp import router as _mcp_router  # noqa: E402
 from assay.ingest.api import router as _dashboard_api_router  # noqa: E402
+from assay.projects.api import router as _projects_router  # noqa: E402
 from assay.promotions.api import router as _promotions_router  # noqa: E402
 
 app.include_router(_mcp_router)
 app.include_router(_dashboard_api_router)
 app.include_router(_promotions_router)
+app.include_router(_projects_router)
 
 # Built SPA dashboard. Session-protected like every other non-public path (the
 # WardenMiddleware guards everything outside public_paths/public_prefixes, and
