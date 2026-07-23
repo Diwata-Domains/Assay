@@ -15,10 +15,11 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from assay.keys.store import create_key
+from assay.keys.store import KeyStoreError, create_key, list_keys, revoke_key
 from assay.store.db import (
     StoreError,
     add_project_origin,
+    delete_project_origin,
     get_project,
     get_project_for_origin,
     insert_project,
@@ -65,8 +66,14 @@ async def list_projects_route(request: Request) -> dict[str, object]:
     db = _db_path(request)
     try:
         projects = list_projects(db)
+        active_keys = [k for k in list_keys(request.app.state.key_store) if not k.get("revoked")]
         for p in projects:
             p["origins"] = [o["origin"] for o in list_project_origins(str(p["id"]), db)]
+            p["keys"] = [
+                {"id": k["id"], "label": k["label"], "created_at": k["created_at"]}
+                for k in active_keys
+                if k.get("project_id") == p["id"]
+            ]
     except StoreError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"projects": projects}
@@ -110,3 +117,37 @@ async def create_project_key_route(
         raise HTTPException(status_code=404, detail=f"project {project_id} not found")
     raw = create_key(request.app.state.key_store, label=body.label, project_id=project_id)
     return {"api_key": raw}
+
+
+@router.delete("/{project_id}/origins")
+async def delete_origin_route(
+    request: Request, project_id: str, body: AddOriginBody
+) -> dict[str, object]:
+    db = _db_path(request)
+    if get_project(project_id, db) is None:
+        raise HTTPException(status_code=404, detail=f"project {project_id} not found")
+    try:
+        delete_project_origin(project_id, body.origin, db_path=db)
+    except StoreError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"deleted": {"origin": body.origin, "project_id": project_id}}
+
+
+@router.post("/{project_id}/keys/{key_id}/revoke")
+async def revoke_project_key_route(
+    request: Request, project_id: str, key_id: str
+) -> dict[str, object]:
+    db = _db_path(request)
+    if get_project(project_id, db) is None:
+        raise HTTPException(status_code=404, detail=f"project {project_id} not found")
+    store = request.app.state.key_store
+    match = next((k for k in list_keys(store) if str(k["id"]) == key_id), None)
+    if match is None or match.get("project_id") != project_id:
+        raise HTTPException(
+            status_code=404, detail=f"key {key_id} not found for project {project_id}"
+        )
+    try:
+        revoke_key(store, key_id)
+    except KeyStoreError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"revoked": key_id}

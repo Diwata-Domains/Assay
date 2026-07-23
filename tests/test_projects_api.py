@@ -99,3 +99,68 @@ def test_mint_additional_project_key(client: TestClient, tmp_path: Path) -> None
     assert r.status_code == 200
     match = verify_key_project(str(tmp_path / "keys.json"), r.json()["api_key"])
     assert match is not None and match.project_id == pid
+
+
+def test_get_projects_includes_active_keys(client: TestClient) -> None:
+    client.post("/api/projects", json={"name": "K", "origin": "https://k.example"})
+    projects = client.get("/api/projects").json()["projects"]
+    proj = next(p for p in projects if p["name"] == "K")
+    assert proj["keys"], "each project should surface its active keys"
+    assert "id" in proj["keys"][0] and "label" in proj["keys"][0]
+
+
+def test_delete_origin_route_unbinds(client: TestClient, tmp_path: Path) -> None:
+    created = client.post(
+        "/api/projects", json={"name": "D", "origin": "https://d.example"}
+    ).json()
+    pid = created["project"]["id"]
+    client.post(f"/api/projects/{pid}/origins", json={"origin": "https://d2.example"})
+    r = client.request(
+        "DELETE", f"/api/projects/{pid}/origins", json={"origin": "https://d2.example"}
+    )
+    assert r.status_code == 200
+    assert r.json()["deleted"]["origin"] == "https://d2.example"
+    db = Path(str(tmp_path / "store.db"))
+    assert get_project_for_origin("https://d2.example", db_path=db) is None
+    # the original create-origin is untouched
+    assert get_project_for_origin("https://d.example", db_path=db) == pid
+
+
+def test_delete_unknown_origin_is_404(client: TestClient) -> None:
+    pid = client.post(
+        "/api/projects", json={"name": "E", "origin": "https://e.example"}
+    ).json()["project"]["id"]
+    r = client.request(
+        "DELETE", f"/api/projects/{pid}/origins", json={"origin": "https://nope.example"}
+    )
+    assert r.status_code == 404
+
+
+def test_revoke_project_key_route(client: TestClient, tmp_path: Path) -> None:
+    created = client.post(
+        "/api/projects", json={"name": "R", "origin": "https://r.example"}
+    ).json()
+    pid = created["project"]["id"]
+    raw = created["api_key"]
+    assert verify_key_project(str(tmp_path / "keys.json"), raw) is not None
+    key_id = next(
+        p for p in client.get("/api/projects").json()["projects"] if p["id"] == pid
+    )["keys"][0]["id"]
+    r = client.post(f"/api/projects/{pid}/keys/{key_id}/revoke")
+    assert r.status_code == 200
+    assert r.json()["revoked"] == key_id
+    # security-critical: the revoked key no longer verifies
+    assert verify_key_project(str(tmp_path / "keys.json"), raw) is None
+
+
+def test_revoke_foreign_key_is_404(client: TestClient) -> None:
+    # A key minted for project A cannot be revoked through project B's route.
+    a = client.post("/api/projects", json={"name": "A", "origin": "https://a.example"}).json()
+    b = client.post("/api/projects", json={"name": "B", "origin": "https://b.example"}).json()
+    a_pid = a["project"]["id"]
+    b_pid = b["project"]["id"]
+    a_key_id = next(
+        p for p in client.get("/api/projects").json()["projects"] if p["id"] == a_pid
+    )["keys"][0]["id"]
+    r = client.post(f"/api/projects/{b_pid}/keys/{a_key_id}/revoke")
+    assert r.status_code == 404
