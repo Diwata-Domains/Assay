@@ -10,10 +10,6 @@ services:
       - ASSAY_ADMIN_PASSWORD_HASH=${ASSAY_ADMIN_PASSWORD_HASH}
       # The app reads WARDEN_SECRET (vendored warden), not ASSAY_JWT_SECRET.
       - WARDEN_SECRET=${WARDEN_SECRET}
-      # Report-widget origins allowed to POST to /ingest. Authoritative over env_file .env.
-      # Temporary static list — replaced by dynamic, DB-backed CORS when the Projects feature
-      # lands (Phase: Assay Projects — dashboard-managed origins + per-project keys).
-      - ASSAY_CORS_ORIGINS=https://crm.example.com,https://platform.acmetechbridge.com
     expose:
       - "8000"
     healthcheck:
