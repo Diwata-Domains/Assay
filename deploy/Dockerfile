@@ -6,6 +6,11 @@ WORKDIR /build
 COPY packages/warden ./packages/warden
 RUN pip install --no-cache-dir ./packages/warden
 
+# grain-contracts >=0.2 is not on PyPI yet (publish blocked on the repo token) —
+# install from the monorepo, same pattern as the diwa image. Revert when 0.2 ships.
+COPY packages/grain-contracts ./packages/grain-contracts
+RUN pip install --no-cache-dir ./packages/grain-contracts
+
 COPY products/assay/pyproject.toml .
 COPY products/assay/src ./src
 RUN pip install --no-cache-dir .
