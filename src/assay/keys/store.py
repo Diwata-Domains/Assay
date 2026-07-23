@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, cast
@@ -17,6 +18,14 @@ import bcrypt
 
 class KeyStoreError(Exception):
     """Raised when the key store is unreadable, malformed, or a key is not found."""
+
+
+@dataclass(frozen=True)
+class KeyMatch:
+    """A verified key: its id plus the project it belongs to (None for legacy keys)."""
+
+    key_id: str
+    project_id: Optional[str]  # noqa: UP007
 
 
 def _now() -> str:
@@ -38,7 +47,11 @@ def _save(path: Path, data: dict[str, object]) -> None:
     path.write_text(json.dumps(data, indent=2))
 
 
-def create_key(store_path: str, label: Optional[str] = None) -> str:  # noqa: UP007
+def create_key(
+    store_path: str,
+    label: Optional[str] = None,  # noqa: UP007
+    project_id: Optional[str] = None,  # noqa: UP007
+) -> str:
     """Generate a new API key, store its bcrypt hash, return the raw key.
 
     The raw key is returned exactly once and never stored.
@@ -59,6 +72,7 @@ def create_key(store_path: str, label: Optional[str] = None) -> str:  # noqa: UP
             "created_at": _now(),
             "revoked": False,
             "revoked_at": None,
+            "project_id": project_id,
         }
     )
     data["keys"] = keys
@@ -78,6 +92,7 @@ def list_keys(store_path: str) -> list[dict[str, object]]:
             "created_at": k["created_at"],
             "revoked": k["revoked"],
             "revoked_at": k["revoked_at"],
+            "project_id": k.get("project_id"),
         }
         for k in keys
     ]
@@ -102,8 +117,11 @@ def revoke_key(store_path: str, key_id: str) -> None:
     raise KeyStoreError(f"key {key_id} not found")
 
 
-def verify_key(store_path: str, raw: str) -> bool:
-    """Return True if raw matches any active (non-revoked) key hash."""
+def verify_key_project(store_path: str, raw: str) -> Optional[KeyMatch]:  # noqa: UP007
+    """Return a KeyMatch for the first active key matching ``raw``, else None.
+
+    Revoked keys are skipped, so a revoked project-bound key resolves to None.
+    """
     path = Path(store_path).expanduser()
     data = _load(path)
     keys: list[dict[str, object]] = cast(list[dict[str, object]], data.get("keys", []))
@@ -113,5 +131,11 @@ def verify_key(store_path: str, raw: str) -> bool:
             continue
         stored_hash = str(key.get("hash", ""))
         if stored_hash and bcrypt.checkpw(raw.encode(), stored_hash.encode()):
-            return True
-    return False
+            pid = key.get("project_id")
+            return KeyMatch(key_id=str(key.get("id", "")), project_id=cast(Optional[str], pid))
+    return None
+
+
+def verify_key(store_path: str, raw: str) -> bool:
+    """Return True if raw matches any active (non-revoked) key hash."""
+    return verify_key_project(store_path, raw) is not None

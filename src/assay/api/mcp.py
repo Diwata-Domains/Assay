@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from assay.api import service
 from assay.contracts.manifest import TOOLS, build_manifest
-from assay.keys.store import verify_key
+from assay.keys.store import verify_key_project
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -28,8 +28,10 @@ def _require_api_key(request: Request, x_assay_key: str | None) -> None:
     if not x_assay_key:
         raise HTTPException(status_code=401, detail="missing X-Assay-Key header")
     store = getattr(request.app.state, "key_store", "~/.assay/keys.json")
-    if not verify_key(store, x_assay_key):
+    match = verify_key_project(store, x_assay_key)
+    if match is None:
         raise HTTPException(status_code=401, detail="invalid or revoked API key")
+    request.state.project_id = match.project_id
 
 
 def _store_db(request: Request) -> str:

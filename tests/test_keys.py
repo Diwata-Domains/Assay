@@ -99,3 +99,66 @@ def test_store_created_in_nested_dir(tmp_path: Path) -> None:
     store = str(tmp_path / "a" / "b" / "keys.json")
     create_key(store)
     assert Path(store).exists()
+
+
+def test_verify_key_project_returns_match_with_project(tmp_path: Path) -> None:
+    from assay.keys.store import verify_key_project
+
+    raw = create_key(_store(tmp_path), project_id="proj-1")
+    match = verify_key_project(_store(tmp_path), raw)
+    assert match is not None
+    assert match.project_id == "proj-1"
+
+
+def test_verify_key_project_none_on_no_match(tmp_path: Path) -> None:
+    from assay.keys.store import verify_key_project
+
+    create_key(_store(tmp_path), project_id="proj-1")
+    assert verify_key_project(_store(tmp_path), "wrong-key") is None
+
+
+def test_verify_key_project_matched_but_no_project(tmp_path: Path) -> None:
+    from assay.keys.store import verify_key_project
+
+    raw = create_key(_store(tmp_path))
+    match = verify_key_project(_store(tmp_path), raw)
+    assert match is not None
+    assert match.project_id is None
+
+
+def test_verify_key_project_none_on_revoked_project_key(tmp_path: Path) -> None:
+    # Security-critical branch: a project-bound key that has been revoked must not verify.
+    from assay.keys.store import verify_key_project
+
+    raw = create_key(_store(tmp_path), project_id="proj-1")
+    key_id = list_keys(_store(tmp_path))[0]["id"]
+    revoke_key(_store(tmp_path), str(key_id))
+    assert verify_key_project(_store(tmp_path), raw) is None
+
+
+def test_verify_key_still_returns_bool(tmp_path: Path) -> None:
+    raw = create_key(_store(tmp_path), project_id="proj-1")
+    assert verify_key(_store(tmp_path), raw) is True
+    assert verify_key(_store(tmp_path), "nope") is False
+
+
+def test_list_keys_includes_project_id(tmp_path: Path) -> None:
+    create_key(_store(tmp_path), project_id="proj-9")
+    keys = list_keys(_store(tmp_path))
+    assert keys[0]["project_id"] == "proj-9"
+
+
+def test_mcp_route_rejects_invalid_key_after_swap(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from assay.ingest.app import app
+
+    app.state.key_store = _store(tmp_path)
+    app.state.store_db = str(tmp_path / "store.db")
+    valid = create_key(_store(tmp_path), project_id="proj-mcp")
+    client = TestClient(app)
+
+    ok = client.get("/mcp/tools", headers={"X-Assay-Key": valid})
+    assert ok.status_code == 200
+    bad = client.get("/mcp/tools", headers={"X-Assay-Key": "not-a-key"})
+    assert bad.status_code == 401

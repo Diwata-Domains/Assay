@@ -12,13 +12,15 @@ from __future__ import annotations
 
 from fastapi import Header, HTTPException, Request
 
-from assay.keys.store import verify_key
+from assay.keys.store import verify_key_project
 
 
 def _require_api_key(request: Request, x_assay_key: str | None = Header(default=None)) -> str:
     if not x_assay_key:
         raise HTTPException(status_code=401, detail="missing X-Assay-Key header")
     store = request.app.state.key_store
-    if not verify_key(store, x_assay_key):
+    match = verify_key_project(store, x_assay_key)
+    if match is None:
         raise HTTPException(status_code=401, detail="invalid or revoked API key")
+    request.state.project_id = match.project_id
     return x_assay_key
