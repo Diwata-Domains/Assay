@@ -977,16 +977,17 @@ def store_import(
 
 @store_app.command("migrate")
 def store_migrate(ctx: typer.Context) -> None:
-    """Backfill a durable ticket for every packet that lacks one (CP-006 migration)."""
+    """Backfill durable tickets (CP-006) and the default 'Unassigned' project (CP-007 rollout)."""
     from pathlib import Path as _Path
 
-    from assay.store.db import backfill_tickets, init_db
+    from assay.store.db import backfill_default_project, backfill_tickets, init_db
 
     config: AssayConfig = ctx.obj
     db_path = _Path(config.store.db).expanduser()
     init_db(db_path)
     created = backfill_tickets(db_path)
-    typer.echo(f"backfilled: {created} ticket(s)")
+    backfill_default_project(db_path)
+    typer.echo(f"backfilled: {created} ticket(s); default project adopted orphan packets/tickets")
 
 
 @ticket_app.command("confirm")

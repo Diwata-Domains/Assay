@@ -809,6 +809,32 @@ def _opt_str(value: object) -> Optional[str]:  # noqa: UP007
     return str(value) if value is not None else None
 
 
+def backfill_default_project(db_path: Optional[Path] = None) -> str:  # noqa: UP007
+    """Create/adopt the 'Unassigned' project owning every unlabelled packet and ticket.
+
+    Idempotent: the project row is created once, and only NULL project_id rows are updated,
+    so re-runs are safe. Returns the default project id.
+    """
+    path = db_path or _DEFAULT_DB
+    init_db(path)
+    now = _utcnow()
+    with _connect(path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO projects (id, name, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (UNASSIGNED_PROJECT_ID, "Unassigned", now, now),
+        )
+        conn.execute(
+            "UPDATE packets SET project_id = ? WHERE project_id IS NULL",
+            (UNASSIGNED_PROJECT_ID,),
+        )
+        conn.execute(
+            "UPDATE tickets SET project_id = ? WHERE project_id IS NULL",
+            (UNASSIGNED_PROJECT_ID,),
+        )
+    return UNASSIGNED_PROJECT_ID
+
+
 def insert_project(
     name: str,
     project_id: Optional[str] = None,  # noqa: UP007

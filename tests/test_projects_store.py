@@ -101,3 +101,40 @@ def test_init_db_is_idempotent_with_project_columns(tmp_path: Path) -> None:
     pid = insert_project("A", db_path=db)
     init_db(db)  # second run: ALTERs already applied, projects row survives
     assert get_project(pid, db_path=db) is not None
+
+
+def test_backfill_default_project_adopts_orphans(tmp_path: Path) -> None:
+    from assay.store.db import (
+        UNASSIGNED_PROJECT_ID,
+        backfill_default_project,
+        get_packet,
+        get_project,
+        get_ticket,
+        init_db,
+        insert_packet,
+        insert_ticket,
+    )
+
+    db = _db(tmp_path)
+    init_db(db)
+    insert_packet(
+        {
+            "verification_id": "VERIFY-1",
+            "task_id": None,
+            "issue_type": "bug_finding",
+            "severity": "info",
+            "outcome": "fail",
+            "summary": "orphan packet",
+        },
+        db,
+    )
+    tid = insert_ticket("orphan ticket", severity="info", db_path=db)
+
+    pid = backfill_default_project(db_path=db)
+    assert pid == UNASSIGNED_PROJECT_ID
+    assert get_project(pid, db) is not None
+    assert get_packet("VERIFY-1", db)["project_id"] == UNASSIGNED_PROJECT_ID
+    assert get_ticket(tid, db)["project_id"] == UNASSIGNED_PROJECT_ID
+    # idempotent: a second run creates nothing new and leaves the assignment intact
+    assert backfill_default_project(db_path=db) == UNASSIGNED_PROJECT_ID
+    assert get_packet("VERIFY-1", db)["project_id"] == UNASSIGNED_PROJECT_ID
