@@ -302,7 +302,7 @@ def list_packets_page(
     try:
         with _connect(path) as conn:
             rows = conn.execute(
-                f"SELECT raw, severity, triage_status, priority FROM packets {where} "
+                f"SELECT raw, severity, triage_status, priority, project_id FROM packets {where} "
                 "ORDER BY verified_at DESC, verification_id DESC LIMIT ? OFFSET ?",
                 [*params, safe_limit, safe_offset],
             ).fetchall()
@@ -324,6 +324,8 @@ def _row_to_packet(row: sqlite3.Row) -> dict[str, object]:
     packet["priority"] = row["priority"]
     if "source_ticket_id" in row.keys():
         packet["source_ticket_id"] = row["source_ticket_id"]
+    if "project_id" in row.keys():
+        packet["project_id"] = row["project_id"]
     return packet
 
 
@@ -338,7 +340,7 @@ def get_packet(
     try:
         with _connect(path) as conn:
             row = conn.execute(
-                "SELECT raw, severity, triage_status, priority, source_ticket_id "
+                "SELECT raw, severity, triage_status, priority, source_ticket_id, project_id "
                 "FROM packets WHERE verification_id = ?",
                 (verification_id,),
             ).fetchone()
@@ -523,6 +525,15 @@ def _set_column(
         raise StoreError(f"set_{column} failed: {exc}") from exc
 
 
+def set_packet_project(
+    verification_id: str,
+    project_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Set project_id on a packet (column + raw JSON). Raises StoreError if not found."""
+    _set_column(verification_id, "project_id", project_id, db_path)
+
+
 def set_triage_status(
     verification_id: str,
     status: str,
@@ -568,6 +579,7 @@ def insert_ticket(
     grain_task_id: Optional[str] = None,  # noqa: UP007
     parent_id: Optional[str] = None,  # noqa: UP007
     db_path: Optional[Path] = None,  # noqa: UP007
+    project_id: Optional[str] = None,  # noqa: UP007
 ) -> str:
     """Create a ticket with a freshly minted ``ASSAY-<n>`` id. Returns the id.
 
@@ -591,8 +603,8 @@ def insert_ticket(
                 """
                 INSERT INTO tickets
                     (id, title, severity, priority, state, grain_task_id,
-                     parent_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     parent_id, created_at, updated_at, project_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ticket_id,
@@ -604,6 +616,7 @@ def insert_ticket(
                     parent_id,
                     now,
                     now,
+                    project_id,
                 ),
             )
     except sqlite3.Error as exc:
@@ -623,7 +636,7 @@ def get_ticket(
         with _connect(path) as conn:
             row = conn.execute(
                 "SELECT id, title, severity, priority, state, grain_task_id, "
-                "parent_id, created_at, updated_at FROM tickets WHERE id = ?",
+                "parent_id, created_at, updated_at, project_id FROM tickets WHERE id = ?",
                 (ticket_id,),
             ).fetchone()
     except sqlite3.Error as exc:

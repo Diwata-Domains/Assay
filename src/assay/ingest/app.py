@@ -228,7 +228,26 @@ async def ingest(
     # it's added to the in-memory packet only after write_packet — but still before
     # _store_ingest_packet so it persists in the stored packet's `raw` JSON.
     packet["kind"] = payload.kind
+    # `project_id` is likewise not yet on the canonical schema (CP-007 is proposed but not
+    # applied), so it is stamped after write_packet too — DB-only until CP-007 lands.
+    project_id = getattr(request.state, "project_id", None)
+    if project_id:
+        packet["project_id"] = project_id
     _store_ingest_packet(packet, request.app.state.store_db)
+    if project_id:
+        from assay.store.db import StoreError as _ProjErr
+        from assay.store.db import set_packet_project
+
+        try:
+            set_packet_project(
+                verification_id, project_id, Path(request.app.state.store_db).expanduser()
+            )
+        except _ProjErr:
+            logger.warning(
+                "could not stamp project_id=%s on verification_id=%s",
+                project_id,
+                verification_id,
+            )
     if source_ticket_id:
         from assay.store.db import StoreError as _StoreError
         from assay.store.db import set_source_ticket_id
@@ -295,11 +314,13 @@ def _wire_ticket(
             if outcome == "pass" and ticket.get("state") == State.IN_PROGRESS.value:
                 advance_ticket(str(source_ticket_id), State.IN_REVIEW, db)
         elif payload.kind == "report" and not source_ticket_id:
+            raw_project_id = packet.get("project_id")
             ticket_id = insert_ticket(
                 title=str(packet.get("summary") or verification_id),
                 severity=str(packet.get("severity") or "info"),
                 priority=str(packet.get("priority") or "none"),
                 db_path=db,
+                project_id=str(raw_project_id) if raw_project_id is not None else None,
             )
             set_source_ticket_id(verification_id, ticket_id, db)
     except StoreError:
