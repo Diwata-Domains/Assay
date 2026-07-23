@@ -211,17 +211,17 @@ async def ingest(
     screenshot_path = _save_screenshot(verification_id, payload.screenshot, output_dir)
     packet["artifact_refs"] = [screenshot_path]
     _attach_diff(packet, payload.url, screenshot_path, output_dir, request.app.state.store_db)
+    # `project_id` is canon (CP-007 applied), so it is stamped before write_packet so it
+    # rides on the on-disk `.json` payload and stays schema-valid.
+    project_id = getattr(request.state, "project_id", None)
+    if project_id:
+        packet["project_id"] = project_id
     write_packet(packet, output_dir)
     # `kind` is Assay-internal triage metadata, not part of the canonical Grain Sentinel
     # payload schema (assay_payload.schema.json) that write_packet's file must satisfy, so
     # it's added to the in-memory packet only after write_packet — but still before
     # _store_ingest_packet so it persists in the stored packet's `raw` JSON.
     packet["kind"] = payload.kind
-    # `project_id` is likewise not yet on the canonical schema (CP-007 is proposed but not
-    # applied), so it is stamped after write_packet too — DB-only until CP-007 lands.
-    project_id = getattr(request.state, "project_id", None)
-    if project_id:
-        packet["project_id"] = project_id
     _store_ingest_packet(packet, request.app.state.store_db)
     if project_id:
         from assay.store.db import StoreError as _ProjErr

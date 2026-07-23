@@ -1,8 +1,8 @@
 """A packet ingested with a project-bound key is stamped with that project_id.
 
-Also proves the on-disk packet file stays valid against the un-amended canonical schema
-(project stamping is DB-only until CP-007 is applied) and that report-kind ingests tag
-the minted ticket with the project.
+Also proves that, post-CP-007, `project_id` rides on the on-disk packet file and the
+file stays schema-valid against the amended `ASSAY_PAYLOAD` schema, and that
+report-kind ingests tag the minted ticket with the project.
 """
 
 from __future__ import annotations
@@ -59,10 +59,9 @@ def test_ingest_stamps_project_id_from_key(
     assert packets, "expected one stored packet"
     assert packets[0]["project_id"] == "proj-crm"
 
-    # the on-disk packet file must remain valid against the un-amended canonical schema:
-    # project_id lives only in the DB until CP-007 is applied. (Mirror test_e2e_sdk's glob.)
+    # CP-007 is applied: project_id now rides on the on-disk packet and stays schema-valid.
     on_disk = json.loads(next(Path(out).glob("assay-*.json")).read_text())
-    assert "project_id" not in on_disk
+    assert on_disk["project_id"] == "proj-crm"
     jsonschema.validate(instance=on_disk, schema=ASSAY_PAYLOAD)
 
 

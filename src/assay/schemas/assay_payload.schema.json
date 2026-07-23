@@ -20,6 +20,10 @@
       "type": ["string", "null"],
       "description": "Owning Assay ticket id (ASSAY-<n>). The packet is a verification event on this ticket; an ingested verdict carries it so the loop can advance the ticket. Null for standalone packets with no ticket."
     },
+    "project_id": {
+      "type": ["string", "null"],
+      "description": "Project this verification was run against, for project-scoping within a single deploy ((project, url) baselines). Null for single-project deploys and standalone runs."
+    },
     "issue_type": {
       "type": "string",
       "enum": ["test_failure", "bug_finding", "screenshot_evidence", "trace_capture", "human_annotation", "code_review"],
