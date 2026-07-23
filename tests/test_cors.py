@@ -52,7 +52,8 @@ def test_registered_origin_preflight_is_allowed(client: TestClient) -> None:
 
 def test_unregistered_origin_is_not_reflected(client: TestClient) -> None:
     r = client.options("/ingest", headers=_preflight("https://evil.example"))
-    assert r.headers.get("access-control-allow-origin") != "https://evil.example"
+    assert r.status_code == 400
+    assert "access-control-allow-origin" not in r.headers
 
 
 def test_cors_inert_on_authed_api_request_with_origin(client: TestClient) -> None:

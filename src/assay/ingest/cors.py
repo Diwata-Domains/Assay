@@ -16,7 +16,6 @@ from pathlib import Path
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import ASGIApp
 
 from assay.store.db import StoreError, get_project_for_origin
 
@@ -24,6 +23,9 @@ _ALLOW_METHODS = "POST, OPTIONS"
 _ALLOW_HEADERS = "content-type, x-assay-key"
 _MAX_AGE = "86400"
 
+# Process-local: `assay serve` runs uvicorn with no workers=, so invalidate_origin_cache()
+# only clears the handling process's cache. A future multi-worker deployment (gunicorn or
+# uvicorn --workers N) would silently leave sibling workers with a stale origin cache.
 _cache: dict[tuple[str, str], bool] = {}
 
 
@@ -58,9 +60,6 @@ def _cors_headers(origin: str) -> dict[str, str]:
 
 class DynamicCORSMiddleware(BaseHTTPMiddleware):
     """Per-request CORS whose allowed origins come from the project_origins table."""
-
-    def __init__(self, app: ASGIApp) -> None:
-        super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         origin = request.headers.get("origin")
