@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from grain_contracts.verification import State
 from pydantic import BaseModel, field_validator, model_validator
@@ -25,6 +24,7 @@ from assay._vendor.warden import (
 )
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
+from assay.ingest.cors import DynamicCORSMiddleware
 from assay.keys.require import _require_api_key
 
 # Where unauthenticated requests are sent to authenticate. Defaults to the local
@@ -43,21 +43,10 @@ app = FastAPI(title="Assay Ingest")
 
 # Browser callers (e.g. a CRM at crm.example.com) hit POST /ingest with the custom
 # X-Assay-Key header, which triggers a CORS preflight. Without CORS handling the app 405s
-# the OPTIONS preflight and the browser blocks the real POST. Origins are env-configurable
-# (comma-separated) so staging/other CRMs can be added without a code change.
-_CORS_ORIGINS = [
-    o.strip()
-    for o in os.environ.get("ASSAY_CORS_ORIGINS", "https://crm.example.com").split(",")
-    if o.strip()
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_CORS_ORIGINS,
-    allow_methods=["POST", "OPTIONS"],
-    allow_headers=["content-type", "x-assay-key"],
-    allow_credentials=False,
-    max_age=86400,
-)
+# the OPTIONS preflight and the browser blocks the real POST. Allowed origins come from
+# the project_origins table (DynamicCORSMiddleware) so the dashboard manages them, not
+# an env var — added before WardenMiddleware so it stays inner to Warden.
+app.add_middleware(DynamicCORSMiddleware)
 
 app.add_middleware(
     WardenMiddleware,

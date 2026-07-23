@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
+from assay.ingest.cors import invalidate_origin_cache
 from assay.keys.store import KeyStoreError, create_key, list_keys, revoke_key
 from assay.store.db import (
     StoreError,
@@ -87,6 +88,7 @@ async def create_project_route(request: Request, body: CreateProjectBody) -> dic
             raise HTTPException(status_code=409, detail=f"origin already registered: {body.origin}")
         pid = insert_project(body.name, db_path=db)
         add_project_origin(pid, body.origin, db_path=db)
+        invalidate_origin_cache()
     except StoreError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     raw = create_key(request.app.state.key_store, label=body.name, project_id=pid)
@@ -103,6 +105,7 @@ async def add_origin_route(
         raise HTTPException(status_code=404, detail=f"project {project_id} not found")
     try:
         add_project_origin(project_id, body.origin, db_path=db)
+        invalidate_origin_cache()
     except StoreError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"origin": {"origin": body.origin, "project_id": project_id}}
@@ -128,6 +131,7 @@ async def delete_origin_route(
         raise HTTPException(status_code=404, detail=f"project {project_id} not found")
     try:
         delete_project_origin(project_id, body.origin, db_path=db)
+        invalidate_origin_cache()
     except StoreError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"deleted": {"origin": body.origin, "project_id": project_id}}
