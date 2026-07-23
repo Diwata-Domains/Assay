@@ -79,6 +79,7 @@ def _summarize(packet: dict[str, object], baseline_vids: set[str]) -> dict[str, 
         "is_baseline": vid in baseline_vids,
         "has_diff": has_diff,
         "diff_pct": diff_pct,
+        "project_id": packet.get("project_id"),
     }
 
 
@@ -89,16 +90,19 @@ async def api_list_packets(
     offset: int = Query(default=0, ge=0),
     outcome: str = Query(default=""),
     task_id: str = Query(default=""),
+    project_id: str = Query(default=""),
 ) -> dict[str, object]:
     db = _db_path(request)
     outcome_filter = outcome.strip() or None
     task_filter = task_id.strip() or None
+    project_filter = project_id.strip() or None
     try:
-        total = count_packets(db, outcome=outcome_filter, task_id=task_filter)
+        total = count_packets(db, outcome=outcome_filter, task_id=task_filter, project_id=project_filter)
         page = list_packets_page(
             db,
             outcome=outcome_filter,
             task_id=task_filter,
+            project_id=project_filter,
             limit=limit,
             offset=offset,
         )

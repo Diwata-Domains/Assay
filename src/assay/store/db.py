@@ -241,8 +241,9 @@ def count_packets(
     outcome: Optional[str] = None,  # noqa: UP007
     task_id: Optional[str] = None,  # noqa: UP007
     triage_status: Optional[str] = None,  # noqa: UP007
+    project_id: Optional[str] = None,  # noqa: UP007
 ) -> int:
-    """Return the total packet count, optionally filtered by outcome, task_id, or triage_status."""
+    """Return the total packet count, optionally filtered by outcome, task_id, triage_status, or project_id."""
     path = db_path or _DEFAULT_DB
     if not path.exists():
         return 0
@@ -257,6 +258,9 @@ def count_packets(
     if triage_status:
         clauses.append("triage_status = ?")
         params.append(triage_status)
+    if project_id:
+        clauses.append("project_id = ?")
+        params.append(project_id)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     try:
         with _connect(path) as conn:
@@ -274,6 +278,7 @@ def list_packets_page(
     outcome: Optional[str] = None,  # noqa: UP007
     task_id: Optional[str] = None,  # noqa: UP007
     triage_status: Optional[str] = None,  # noqa: UP007
+    project_id: Optional[str] = None,  # noqa: UP007
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, object]]:
@@ -296,6 +301,9 @@ def list_packets_page(
     if triage_status:
         clauses.append("triage_status = ?")
         params.append(triage_status)
+    if project_id:
+        clauses.append("project_id = ?")
+        params.append(project_id)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     safe_limit = max(0, int(limit))
     safe_offset = max(0, int(offset))
