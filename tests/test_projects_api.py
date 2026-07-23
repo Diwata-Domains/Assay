@@ -153,6 +153,22 @@ def test_revoke_project_key_route(client: TestClient, tmp_path: Path) -> None:
     assert verify_key_project(str(tmp_path / "keys.json"), raw) is None
 
 
+def test_revoked_key_excluded_from_projects_list(client: TestClient) -> None:
+    created = client.post(
+        "/api/projects", json={"name": "V", "origin": "https://v.example"}
+    ).json()
+    pid = created["project"]["id"]
+    key_id = next(
+        p for p in client.get("/api/projects").json()["projects"] if p["id"] == pid
+    )["keys"][0]["id"]
+    r = client.post(f"/api/projects/{pid}/keys/{key_id}/revoke")
+    assert r.status_code == 200
+    proj = next(
+        p for p in client.get("/api/projects").json()["projects"] if p["id"] == pid
+    )
+    assert proj["keys"] == []
+
+
 def test_revoke_foreign_key_is_404(client: TestClient) -> None:
     # A key minted for project A cannot be revoked through project B's route.
     a = client.post("/api/projects", json={"name": "A", "origin": "https://a.example"}).json()

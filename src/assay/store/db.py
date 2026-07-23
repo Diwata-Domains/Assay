@@ -666,13 +666,13 @@ def list_tickets(
             if state_value is None:
                 rows = conn.execute(
                     "SELECT id, title, severity, priority, state, grain_task_id, "
-                    "parent_id, created_at, updated_at FROM tickets "
+                    "parent_id, created_at, updated_at, project_id FROM tickets "
                     "ORDER BY created_at DESC"
                 ).fetchall()
             else:
                 rows = conn.execute(
                     "SELECT id, title, severity, priority, state, grain_task_id, "
-                    "parent_id, created_at, updated_at FROM tickets "
+                    "parent_id, created_at, updated_at, project_id FROM tickets "
                     "WHERE state = ? ORDER BY created_at DESC",
                     (state_value,),
                 ).fetchall()

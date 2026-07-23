@@ -102,8 +102,11 @@ def test_list_tickets_returns_all(tmp_path: Path) -> None:
     db = tmp_path / "store.db"
     init_db(db)
     a = insert_ticket("first", "info", db_path=db)
-    b = insert_ticket("second", "error", db_path=db)
-    assert {t["id"] for t in list_tickets(db_path=db)} == {a, b}
+    b = insert_ticket("second", "error", project_id="proj-x", db_path=db)
+    tickets = {t["id"]: t for t in list_tickets(db_path=db)}
+    assert set(tickets) == {a, b}
+    assert tickets[a]["project_id"] is None
+    assert tickets[b]["project_id"] == "proj-x"
 
 
 def test_list_tickets_filters_by_state(tmp_path: Path) -> None:
