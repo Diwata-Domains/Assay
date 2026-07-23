@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -79,6 +80,24 @@ CREATE TABLE IF NOT EXISTS tickets (
 )
 """
 
+UNASSIGNED_PROJECT_ID = "unassigned"
+
+_CREATE_PROJECTS = """
+CREATE TABLE IF NOT EXISTS projects (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)
+"""
+
+_CREATE_PROJECT_ORIGINS = """
+CREATE TABLE IF NOT EXISTS project_origins (
+    origin     TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id)
+)
+"""
+
 
 class StoreError(Exception):
     """Raised on unrecoverable store failures."""
@@ -116,6 +135,8 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
         conn.execute(_CREATE_BASELINES)
         conn.execute(_CREATE_CHECK_RESULTS)
         conn.execute(_CREATE_TICKETS)
+        conn.execute(_CREATE_PROJECTS)
+        conn.execute(_CREATE_PROJECT_ORIGINS)
         try:
             conn.execute("ALTER TABLE packets ADD COLUMN diff_result TEXT")
         except sqlite3.OperationalError:
@@ -134,6 +155,14 @@ def init_db(db_path: Optional[Path] = None) -> Path:  # noqa: UP007
             pass
         try:
             conn.execute("ALTER TABLE packets ADD COLUMN priority TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE packets ADD COLUMN project_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE tickets ADD COLUMN project_id TEXT")
         except sqlite3.OperationalError:
             pass
     return path
@@ -765,3 +794,155 @@ def backfill_tickets(db_path: Optional[Path] = None) -> int:  # noqa: UP007
 
 def _opt_str(value: object) -> Optional[str]:  # noqa: UP007
     return str(value) if value is not None else None
+
+
+def insert_project(
+    name: str,
+    project_id: Optional[str] = None,  # noqa: UP007
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> str:
+    """Create a project, returning its id. Generates a uuid id when none is given."""
+    if not name:
+        raise StoreError("project requires a non-empty name")
+    path = db_path or _DEFAULT_DB
+    pid = project_id or uuid.uuid4().hex
+    now = _utcnow()
+    try:
+        with _connect(path) as conn:
+            conn.execute(_CREATE_PROJECTS)
+            conn.execute(
+                "INSERT OR IGNORE INTO projects (id, name, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?)",
+                (pid, name, now, now),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"insert_project failed: {exc}") from exc
+    return pid
+
+
+def get_project(
+    project_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> Optional[dict[str, object]]:  # noqa: UP007
+    """Return a project by id, or None."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return None
+    try:
+        with _connect(path) as conn:
+            row = conn.execute(
+                "SELECT id, name, created_at, updated_at FROM projects WHERE id = ?",
+                (project_id,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StoreError(f"get_project failed: {exc}") from exc
+    return cast(dict[str, object], dict(row)) if row is not None else None
+
+
+def list_projects(
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> list[dict[str, object]]:
+    """Return all projects, newest first (deterministic via the monotonic rowid tiebreaker)."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return []
+    try:
+        with _connect(path) as conn:
+            rows = conn.execute(
+                "SELECT id, name, created_at, updated_at FROM projects "
+                "ORDER BY created_at DESC, rowid DESC"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_projects failed: {exc}") from exc
+    return [cast(dict[str, object], dict(row)) for row in rows]
+
+
+def add_project_origin(
+    project_id: str,
+    origin: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Bind an origin to a project. Origin is globally UNIQUE; a duplicate raises StoreError."""
+    path = db_path or _DEFAULT_DB
+    if not origin:
+        raise StoreError("origin must be non-empty")
+    try:
+        with _connect(path) as conn:
+            conn.execute(_CREATE_PROJECT_ORIGINS)
+            conn.execute(
+                "INSERT INTO project_origins (origin, project_id) VALUES (?, ?)",
+                (origin, project_id),
+            )
+    except sqlite3.IntegrityError as exc:
+        raise StoreError(f"origin already registered: {origin}") from exc
+    except sqlite3.Error as exc:
+        raise StoreError(f"add_project_origin failed: {exc}") from exc
+
+
+def list_project_origins(
+    project_id: Optional[str] = None,  # noqa: UP007
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> list[dict[str, object]]:
+    """Return origins, optionally scoped to a single project."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return []
+    try:
+        with _connect(path) as conn:
+            if project_id is None:
+                rows = conn.execute(
+                    "SELECT origin, project_id FROM project_origins ORDER BY origin ASC"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT origin, project_id FROM project_origins "
+                    "WHERE project_id = ? ORDER BY origin ASC",
+                    (project_id,),
+                ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_project_origins failed: {exc}") from exc
+    return [cast(dict[str, object], dict(row)) for row in rows]
+
+
+def get_project_for_origin(
+    origin: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> Optional[str]:  # noqa: UP007
+    """Return the project id owning ``origin``, or None."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return None
+    try:
+        with _connect(path) as conn:
+            row = conn.execute(
+                "SELECT project_id FROM project_origins WHERE origin = ?",
+                (origin,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise StoreError(f"get_project_for_origin failed: {exc}") from exc
+    return str(row["project_id"]) if row is not None else None
+
+
+def delete_project_origin(
+    project_id: str,
+    origin: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Unbind ``origin`` from ``project_id``. Raises StoreError if the pair is not registered.
+
+    The DELETE is scoped by BOTH origin and project_id, so an operator cannot unbind an
+    origin that belongs to a different project. A zero-rowcount delete raises so the API
+    layer can surface a 404 rather than silently succeeding on a stale/foreign origin.
+    """
+    path = db_path or _DEFAULT_DB
+    try:
+        with _connect(path) as conn:
+            conn.execute(_CREATE_PROJECT_ORIGINS)
+            cur = conn.execute(
+                "DELETE FROM project_origins WHERE origin = ? AND project_id = ?",
+                (origin, project_id),
+            )
+            if cur.rowcount == 0:
+                raise StoreError(f"origin not bound to project {project_id}: {origin}")
+    except sqlite3.Error as exc:
+        raise StoreError(f"delete_project_origin failed: {exc}") from exc
