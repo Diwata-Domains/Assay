@@ -21,15 +21,22 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
+from grain_contracts.verification import State
 from pydantic import BaseModel, field_validator
 
 from assay.store.db import (
     StoreError,
+    advance_ticket,
     count_packets,
     get_baseline_for_url,
     get_packet,
+    get_ticket,
     list_baselines,
+    list_packets_for_ticket,
     list_packets_page,
+    list_ticket_evidence,
+    list_tickets,
+    reopen_ticket,
     set_baseline,
     set_review_status,
 )
@@ -199,6 +206,109 @@ async def api_baseline_png(request: Request, verification_id: str) -> FileRespon
     if baseline is None:
         raise HTTPException(status_code=404, detail="image not found")
     return _png_response(_candidate_png(baseline), f"{verification_id}-baseline.png")
+
+
+# ── Tickets (CP-006 durable work items) ─────────────────────────────────────
+#
+# The ticket surface reads the tickets table plus a per-ticket evidence rollup of
+# the linked verification packets. Actions map onto the CP-006 lifecycle:
+# propose-close (in_progress -> in_review), confirm-close (in_review -> done),
+# cancel (any non-terminal -> canceled) via the forward-only `advance_ticket`,
+# and reopen (in_review|done -> in_progress, same ticket — the 1:1 ruling) via
+# `reopen_ticket`.
+
+_EMPTY_EVIDENCE: dict[str, object] = {
+    "packet_count": 0,
+    "latest_verification_id": None,
+    "latest_outcome": None,
+    "latest_verified_at": None,
+    "latest_kind": None,
+    "has_screenshot": False,
+    "has_diff": False,
+}
+
+
+def _ticket_payload(ticket: dict[str, object], evidence: dict[str, object]) -> dict[str, object]:
+    return {**ticket, "evidence": {**_EMPTY_EVIDENCE, **evidence}}
+
+
+@router.get("/tickets")
+async def api_list_tickets(request: Request) -> dict[str, object]:
+    db = _db_path(request)
+    try:
+        tickets = list_tickets(None, db)
+        evidence = list_ticket_evidence(db)
+    except StoreError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {
+        "tickets": [_ticket_payload(t, evidence.get(str(t["id"]), {})) for t in tickets],
+        "total": len(tickets),
+    }
+
+
+@router.get("/tickets/{ticket_id}")
+async def api_get_ticket(request: Request, ticket_id: str) -> dict[str, object]:
+    db = _db_path(request)
+    try:
+        ticket = get_ticket(ticket_id, db)
+    except StoreError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if ticket is None:
+        raise HTTPException(status_code=404, detail=f"ticket {ticket_id} not found")
+    try:
+        packets = list_packets_for_ticket(ticket_id, db)
+        evidence = list_ticket_evidence(db)
+        baseline_vids = set(list_baselines(db).values())
+    except StoreError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    payload = _ticket_payload(ticket, evidence.get(ticket_id, {}))
+    payload["packets"] = [_summarize(p, baseline_vids) for p in packets]
+    return payload
+
+
+_TICKET_ACTIONS: dict[str, object] = {
+    "propose-close": State.IN_REVIEW,
+    "confirm-close": State.DONE,
+    "cancel": State.CANCELED,
+    "reopen": None,
+}
+
+
+class TicketActionRequest(BaseModel):
+    action: str
+
+    @field_validator("action")
+    @classmethod
+    def known_action(cls, v: str) -> str:
+        if v not in _TICKET_ACTIONS:
+            raise ValueError(
+                "action must be one of: propose-close, confirm-close, reopen, cancel"
+            )
+        return v
+
+
+@router.post("/tickets/{ticket_id}/action")
+async def api_ticket_action(
+    request: Request,
+    ticket_id: str,
+    body: TicketActionRequest,
+) -> dict[str, object]:
+    db = _db_path(request)
+    try:
+        ticket = get_ticket(ticket_id, db)
+    except StoreError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if ticket is None:
+        raise HTTPException(status_code=404, detail=f"ticket {ticket_id} not found")
+    try:
+        if body.action == "reopen":
+            reopen_ticket(ticket_id, db)
+        else:
+            advance_ticket(ticket_id, _TICKET_ACTIONS[body.action], db)
+    except StoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    updated = get_ticket(ticket_id, db) or ticket
+    return {"id": ticket_id, "state": updated.get("state")}
 
 
 class ReviewRequest(BaseModel):

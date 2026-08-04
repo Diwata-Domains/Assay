@@ -710,6 +710,118 @@ def advance_ticket(
         raise StoreError(f"advance_ticket failed: {exc}") from exc
 
 
+_REOPENABLE_STATES: frozenset[State] = frozenset({State.IN_REVIEW, State.DONE})
+
+
+def reopen_ticket(
+    ticket_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> None:
+    """Reopen the SAME ticket back to ``in_progress`` (1:1 reopen, founder-ruled 2026-07-17).
+
+    Legal from ``in_review`` (a human disputes the proposed close) and from ``done``
+    (a regression resurfaces after confirm). Reopening never mints a new ticket or
+    Grain task — the ticket<->task 1:1 holds, so the ticket returns to ``in_progress``
+    where the existing task resumes. This is deliberately outside
+    ``_ALLOWED_TRANSITIONS`` (which stays the forward-only CP-006 machine).
+    """
+    path = db_path or _DEFAULT_DB
+    try:
+        with _connect(path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT state FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+            if row is None:
+                raise StoreError(f"ticket {ticket_id} not found")
+            current = _coerce_state(row["state"])
+            if current not in _REOPENABLE_STATES:
+                raise StoreError(f"illegal transition {current.value} -> in_progress")
+            conn.execute(
+                "UPDATE tickets SET state = ?, updated_at = ? WHERE id = ?",
+                (State.IN_PROGRESS.value, _utcnow(), ticket_id),
+            )
+    except sqlite3.Error as exc:
+        raise StoreError(f"reopen_ticket failed: {exc}") from exc
+
+
+def list_packets_for_ticket(
+    ticket_id: str,
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> list[dict[str, object]]:
+    """Return a ticket's verification packets newest-first — its evidence timeline."""
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return []
+    try:
+        with _connect(path) as conn:
+            rows = conn.execute(
+                "SELECT raw, severity, triage_status, priority, source_ticket_id, project_id "
+                "FROM packets WHERE source_ticket_id = ? "
+                "ORDER BY verified_at DESC, verification_id DESC",
+                (ticket_id,),
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_packets_for_ticket failed: {exc}") from exc
+    return [_row_to_packet(row) for row in rows]
+
+
+def list_ticket_evidence(
+    db_path: Optional[Path] = None,  # noqa: UP007
+) -> dict[str, dict[str, object]]:
+    """Per-ticket evidence rollup keyed by ticket id.
+
+    One pass over the linked packets (oldest first, so the last row seen per ticket
+    is the latest verification) — the dashboard's ticket list needs the rollup for
+    every ticket at once, so this avoids a per-ticket query.
+    """
+    path = db_path or _DEFAULT_DB
+    if not path.exists():
+        return {}
+    try:
+        with _connect(path) as conn:
+            rows = conn.execute(
+                "SELECT source_ticket_id, verification_id, outcome, verified_at, "
+                "artifact_refs, diff_result, raw FROM packets "
+                "WHERE source_ticket_id IS NOT NULL "
+                "ORDER BY verified_at ASC, verification_id ASC"
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise StoreError(f"list_ticket_evidence failed: {exc}") from exc
+    rollup: dict[str, dict[str, object]] = {}
+    for row in rows:
+        tid = str(row["source_ticket_id"])
+        try:
+            refs = json.loads(row["artifact_refs"] or "[]")
+        except ValueError:
+            refs = []
+        has_screenshot = any(
+            str(r).endswith(".png") and "_diff" not in Path(str(r)).stem for r in refs
+        )
+        try:
+            kind = json.loads(row["raw"]).get("kind")
+        except (ValueError, AttributeError):
+            kind = None
+        entry = rollup.setdefault(
+            tid,
+            {
+                "packet_count": 0,
+                "latest_verification_id": None,
+                "latest_outcome": None,
+                "latest_verified_at": None,
+                "latest_kind": None,
+                "has_screenshot": False,
+                "has_diff": False,
+            },
+        )
+        entry["packet_count"] = int(str(entry["packet_count"])) + 1
+        entry["latest_verification_id"] = row["verification_id"]
+        entry["latest_outcome"] = row["outcome"]
+        entry["latest_verified_at"] = row["verified_at"]
+        entry["latest_kind"] = kind
+        entry["has_screenshot"] = bool(entry["has_screenshot"]) or has_screenshot
+        entry["has_diff"] = bool(entry["has_diff"]) or row["diff_result"] is not None
+    return rollup
+
+
 def set_ticket_grain_task_id(
     ticket_id: str,
     grain_task_id: str,
