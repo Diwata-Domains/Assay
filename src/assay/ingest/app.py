@@ -350,7 +350,15 @@ async def logout() -> Response:
     return response
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
+async def root() -> RedirectResponse:
+    """The SPA is the dashboard (founder ruling 2026-08-04); the legacy
+    inline page moved to /legacy for the transition. Customer integrations
+    (the Assay action, SDK) speak API paths and never land here."""
+    return RedirectResponse("/dashboard", status_code=307)
+
+
+@app.get("/legacy", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
     from assay.store.db import list_baselines as _baselines
     from assay.store.db import list_packets as _list

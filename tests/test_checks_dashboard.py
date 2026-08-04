@@ -88,7 +88,7 @@ def test_checks_route_shows_fail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
 def test_checks_route_in_nav(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _setup_app(tmp_path, monkeypatch)
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert "/checks" in resp.text
 

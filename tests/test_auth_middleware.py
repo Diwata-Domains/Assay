@@ -86,8 +86,12 @@ def test_status_accessible_without_session(client: TestClient) -> None:
 
 def test_dashboard_accessible_with_valid_session(client: TestClient) -> None:
     client.cookies.set("warden_session", _session_cookie())
+    # "/" hands an authenticated visitor to the SPA (founder ruling 2026-08-04);
+    # the inline page lives on at /legacy.
     r = client.get("/")
-    assert r.status_code == 200
+    assert r.status_code == 307
+    assert r.headers["location"] == "/dashboard"
+    assert client.get("/legacy").status_code == 200
 
 
 def test_invalid_token_redirects_to_gate(client: TestClient) -> None:

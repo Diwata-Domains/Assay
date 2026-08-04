@@ -47,7 +47,7 @@ def _setup_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 def test_dashboard_returns_200(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _setup_app(tmp_path, monkeypatch)
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
 
@@ -58,7 +58,7 @@ def test_dashboard_contains_packet_data(tmp_path: Path, monkeypatch: pytest.Monk
     insert_packet(_PACKET, db)
     client = _setup_app(tmp_path, monkeypatch)
 
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert "dddd-0004" in resp.text
     assert "dashboard test packet" in resp.text
@@ -67,7 +67,7 @@ def test_dashboard_contains_packet_data(tmp_path: Path, monkeypatch: pytest.Monk
 
 def test_dashboard_empty_store_shows_no_packets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _setup_app(tmp_path, monkeypatch)
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert "no packets" in resp.text
 
@@ -80,7 +80,7 @@ def test_dashboard_summary_counts(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     insert_packet({**_PACKET, "verification_id": "e003", "outcome": "fail"}, db)
     client = _setup_app(tmp_path, monkeypatch)
 
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert "3 total" in resp.text
     assert "1 pass" in resp.text
     assert "2 fail" in resp.text
@@ -93,7 +93,7 @@ def test_dashboard_screenshot_yes(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     insert_packet({**_PACKET, "artifact_refs": [png]}, db)
     client = _setup_app(tmp_path, monkeypatch)
 
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert "yes" in resp.text
 
 
@@ -103,7 +103,7 @@ def test_dashboard_screenshot_no(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     insert_packet({**_PACKET, "artifact_refs": []}, db)
     client = _setup_app(tmp_path, monkeypatch)
 
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert "no" in resp.text
 
 

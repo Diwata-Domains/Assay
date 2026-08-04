@@ -158,7 +158,7 @@ def test_dashboard_shows_baseline_badge(tmp_path: Path, monkeypatch: pytest.Monk
     insert_packet(_PACKET_A, db)
     set_baseline("aaa-0001", db)
     client = _setup_app(tmp_path, monkeypatch)
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert 'class="baseline-badge"' in resp.text
 
@@ -168,7 +168,7 @@ def test_dashboard_no_badge_without_baseline(tmp_path: Path, monkeypatch: pytest
     init_db(db)
     insert_packet(_PACKET_A, db)
     client = _setup_app(tmp_path, monkeypatch)
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert 'class="baseline-badge"' not in resp.text
 

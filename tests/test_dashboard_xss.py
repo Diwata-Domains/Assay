@@ -48,7 +48,7 @@ def _setup_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 def test_dashboard_list_escapes_packet_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _setup_app(tmp_path, monkeypatch)
-    resp = client.get("/")
+    resp = client.get("/legacy")
     assert resp.status_code == 200
     assert _XSS not in resp.text
     assert "&lt;script&gt;" in resp.text
