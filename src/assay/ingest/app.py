@@ -19,18 +19,32 @@ from pydantic import BaseModel, field_validator, model_validator
 
 from assay._vendor.warden import (
     WardenConfig,
-    WardenMiddleware,
     clear_session_cookie,
 )
 from assay.formatter.formatter import format_sdk_packet
 from assay.formatter.writer import write_packet
 from assay.ingest.cors import DynamicCORSMiddleware
+from assay.ingest.gate_sso import (
+    AssaySessionMiddleware,
+    HandoffError,
+    assay_session_config,
+    begin_handoff,
+    complete_handoff,
+    gate_sso_enabled,
+)
 from assay.keys.require import _require_api_key
 
 # Where unauthenticated requests are sent to authenticate. Defaults to the local
 # "/login" route for dev; in production the operator points this at Gate
 # (e.g. https://gate.diwata.domains/login) so auth is delegated for SSO across
 # all .diwata.domains products sharing the same WARDEN_SECRET + cookie domain.
+#
+# This is the LEGACY shared-cookie path. When ASSAY_GATE_SSO is on, /login and
+# the session middleware instead run the diwata.id-ready CODE-HANDOFF (see
+# assay.ingest.gate_sso): redirect to the gate with Assay's client_id + a
+# registered callback, redeem the one-time code server-side, and mint Assay's own
+# ``assay_session`` cookie. The flag defaults off, so nothing below changes until
+# the operator flips it.
 LOGIN_URL = os.environ.get("ASSAY_LOGIN_URL", "/login")
 # SSO is active only when ASSAY_LOGIN_URL points at an EXTERNAL auth service (Gate).
 # With the local "/login" default, delegating would self-redirect, so auth is treated
@@ -48,10 +62,26 @@ app = FastAPI(title="Assay Ingest")
 # an env var — added before WardenMiddleware so it stays inner to Warden.
 app.add_middleware(DynamicCORSMiddleware)
 
+# AssaySessionMiddleware reads Assay's OWN ``assay_session`` cookie first
+# (code-handoff) and the legacy shared ``warden_session`` only as a transition
+# fallback, so a single deploy carries both live shared-cookie sessions and fresh
+# code-handoff sessions without a login gap. With ASSAY_GATE_SSO off it is
+# byte-identical to the WardenMiddleware it replaces (same public paths, same
+# deny → redirect to LOGIN_URL with ?next=, or 401). ``/auth/callback`` is public:
+# the browser lands there with the gate's one-time code BEFORE any session exists.
 app.add_middleware(
-    WardenMiddleware,
+    AssaySessionMiddleware,
     public_paths=frozenset(
-        {"/login", "/logout", "/ingest", "/ping", "/health", "/docs", "/openapi.json"}
+        {
+            "/login",
+            "/logout",
+            "/auth/callback",
+            "/ingest",
+            "/ping",
+            "/health",
+            "/docs",
+            "/openapi.json",
+        }
     ),
     public_prefixes=("/status/", "/mcp", "/baselines", "/promotions"),
     login_url=LOGIN_URL if _SSO_ENABLED else None,
@@ -329,9 +359,21 @@ async def ping(_key: str = Depends(_require_api_key)) -> dict[str, str]:
 
 
 @app.get("/login")
-async def login_page() -> Response:
-    # Assay delegates auth to Gate (gate.diwata.domains) for SSO when configured. When
-    # SSO is not configured (ASSAY_LOGIN_URL unset), do NOT self-redirect — return 503.
+async def login_page(request: Request) -> Response:
+    # The single auth entry point: page-load denials (the middleware) and the SPA's
+    # 401 bounce (main.tsx → /login?next=) both land here.
+    #
+    # Code-handoff ON: redirect to the gate with Assay's client_id + registered
+    # callback + a state cookie, then GET /auth/callback redeems the code and mints
+    # ``assay_session``. A half-configured client env falls through to the legacy
+    # path so users are never locked out.
+    if gate_sso_enabled():
+        handoff = begin_handoff(request, request.query_params.get("next"))
+        if handoff is not None:
+            return handoff
+    # Legacy shared-cookie path: delegate to Gate (gate.diwata.domains) when
+    # configured. When SSO is not configured (ASSAY_LOGIN_URL unset), do NOT
+    # self-redirect — return 503.
     if _SSO_ENABLED:
         return RedirectResponse(url=LOGIN_URL, status_code=303)
     return JSONResponse(
@@ -340,12 +382,30 @@ async def login_page() -> Response:
     )
 
 
+@app.get("/auth/callback")
+async def gate_callback(request: Request) -> Response:
+    # The registered gate callback (one_login_spec.md §4 step 3/4): the gate lands
+    # the browser here with ?code=&state=. Redeem the code server-side and mint
+    # Assay's own ``assay_session``, then step into the app. The door does not exist
+    # until code-handoff is turned on (404), so the legacy deploy is inert.
+    if not gate_sso_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    try:
+        return await complete_handoff(request)
+    except HandoffError:
+        # Stale/reused link or a refused code — send them back to re-initiate.
+        return RedirectResponse("/login", status_code=303)
+
+
 @app.get("/logout")
 async def logout() -> Response:
-    # Logout is central: clearing the shared .diwata.domains session cookie signs the
-    # user out of every product, then send them back to Gate's login (or "/" if unset).
+    # Logout is central: clear the session and bounce to Gate's login (or "/" if
+    # unset). Clears BOTH Assay's own ``assay_session`` and the legacy shared
+    # ``.diwata.domains`` cookie — the browser may carry either during the
+    # transition, and the shared clear still signs the user out suite-wide.
     response: Response = RedirectResponse(url=LOGIN_URL if _SSO_ENABLED else "/", status_code=303)
     if os.environ.get("WARDEN_SECRET", "").strip():
+        clear_session_cookie(response, assay_session_config())
         clear_session_cookie(response, WardenConfig.from_env())
     return response
 
