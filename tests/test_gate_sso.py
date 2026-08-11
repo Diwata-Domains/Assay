@@ -181,3 +181,15 @@ def test_logout_clears_both_cookies(env) -> None:
     blob = " ".join(res.headers.get_list("set-cookie"))
     assert ASSAY_COOKIE_NAME in blob
     assert SHARED_COOKIE_NAME in blob
+
+
+def test_logout_bounces_to_gate_logout_not_login(env, monkeypatch) -> None:
+    """With code-handoff on, logout must end the GATE's anchor session too.
+    Redirecting to the gate's login page signs the user straight back in (the
+    gate still holds a live session and immediately reissues a code) — the
+    sign-out loop the founder hit on staging, 2026-08-11."""
+    _enable(monkeypatch)
+    res = _client().get("/logout")
+    target = res.headers["location"]
+    assert target.endswith("/logout"), target
+    assert "/login" not in target

@@ -399,11 +399,21 @@ async def gate_callback(request: Request) -> Response:
 
 @app.get("/logout")
 async def logout() -> Response:
-    # Logout is central: clear the session and bounce to Gate's login (or "/" if
-    # unset). Clears BOTH Assay's own ``assay_session`` and the legacy shared
-    # ``.diwata.domains`` cookie — the browser may carry either during the
-    # transition, and the shared clear still signs the user out suite-wide.
-    response: Response = RedirectResponse(url=LOGIN_URL if _SSO_ENABLED else "/", status_code=303)
+    # Logout is central: clear the local session, then end the GATE's anchor
+    # session by bouncing to the gate's /logout — never its login page. With
+    # code-handoff on, the gate still holds a live session; landing on its
+    # login just reissues a code and signs the user straight back in (the
+    # sign-out loop hit on staging, 2026-08-11). Clears BOTH Assay's own
+    # ``assay_session`` and the legacy shared cookie — the browser may carry
+    # either during the transition.
+    gate_origin = os.environ.get("GATE_PUBLIC_ORIGIN", "").strip().rstrip("/")
+    if gate_sso_enabled() and gate_origin:
+        target = gate_origin + "/logout"
+    elif _SSO_ENABLED:
+        target = LOGIN_URL
+    else:
+        target = "/"
+    response: Response = RedirectResponse(url=target, status_code=303)
     if os.environ.get("WARDEN_SECRET", "").strip():
         clear_session_cookie(response, assay_session_config())
         clear_session_cookie(response, WardenConfig.from_env())
