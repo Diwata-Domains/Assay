@@ -9,6 +9,7 @@ import base64
 import html
 import logging
 import os
+from urllib.parse import quote
 from pathlib import Path
 from typing import Any
 
@@ -398,7 +399,7 @@ async def gate_callback(request: Request) -> Response:
 
 
 @app.get("/logout")
-async def logout() -> Response:
+async def logout(request: Request) -> Response:
     # Logout is central: clear the local session, then end the GATE's anchor
     # session by bouncing to the gate's /logout — never its login page. With
     # code-handoff on, the gate still holds a live session; landing on its
@@ -408,7 +409,11 @@ async def logout() -> Response:
     # either during the transition.
     gate_origin = os.environ.get("GATE_PUBLIC_ORIGIN", "").strip().rstrip("/")
     if gate_sso_enabled() and gate_origin:
-        target = gate_origin + "/logout"
+        # Carry our own origin so the gate's sign-in keeps the Assay plate
+        # (and a fresh sign-in returns here) instead of the generic page.
+        proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip() or request.url.scheme
+        host = request.headers.get("host", "").strip() or request.url.netloc
+        target = gate_origin + "/logout?next=" + quote(f"{proto}://{host}/", safe="")
     elif _SSO_ENABLED:
         target = LOGIN_URL
     else:

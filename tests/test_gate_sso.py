@@ -191,5 +191,5 @@ def test_logout_bounces_to_gate_logout_not_login(env, monkeypatch) -> None:
     _enable(monkeypatch)
     res = _client().get("/logout")
     target = res.headers["location"]
-    assert target.endswith("/logout"), target
-    assert "/login" not in target
+    assert "/logout?next=" in target, target
+    assert "/login" not in target.split("?")[0]
