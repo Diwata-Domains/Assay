@@ -9,9 +9,9 @@ import base64
 import html
 import logging
 import os
-from urllib.parse import quote
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
